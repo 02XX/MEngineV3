@@ -1,0 +1,116 @@
+#pragma once
+#include <memory>
+#include <optional>
+#include <vulkan/vulkan.hpp>
+#include <vulkan/vulkan_handles.hpp>
+
+namespace MEngine
+{
+struct VulkanContextConfig
+{
+    std::vector<const char *> InstanceRequiredExtensions;
+    std::vector<const char *> InstanceRequiredLayers;
+    std::vector<const char *> DeviceRequiredExtensions;
+    std::vector<const char *> DeviceRequiredLayers;
+};
+class VulkanContext
+{
+  private:
+    // DI
+    std::shared_ptr<VulkanContextConfig> mConfig;
+
+  private:
+    // properties
+    vk::UniqueInstance Instance;
+    vk::PhysicalDevice PhysicalDevice;
+    struct QueueFamilyIndicates
+    {
+        std::optional<uint32_t> graphicsFamily;
+        std::optional<uint32_t> graphicsFamilyCount;
+        std::optional<uint32_t> presentFamily;
+        std::optional<uint32_t> presentFamilyCount;
+        std::optional<uint32_t> transferFamily;
+        std::optional<uint32_t> transferFamilyCount;
+    } QueueFamilyIndicates;
+    vk::UniqueDevice Device;
+    vk::UniqueSurfaceKHR Surface;
+    vk::UniqueCommandPool GraphicsCommandPool;
+    vk::UniqueCommandPool TransferCommandPool;
+    vk::UniqueCommandPool PresentCommandPool;
+    vk::Queue GraphicsQueue;
+    vk::Queue TransferQueue;
+    vk::Queue PresentQueue;
+    uint32_t Version = 0;
+
+  public:
+    inline const std::shared_ptr<VulkanContextConfig> &GetConfig() const
+    {
+        return mConfig;
+    }
+    inline const vk::Instance &GetInstance() const
+    {
+        return *Instance;
+    }
+    inline const vk::PhysicalDevice &GetPhysicalDevice() const
+    {
+        return PhysicalDevice;
+    }
+    inline const vk::Device &GetDevice() const
+    {
+        return *Device;
+    }
+    inline const vk::SurfaceKHR &GetSurface() const
+    {
+        return *Surface;
+    }
+    inline const vk::Queue &GetGraphicsQueue() const
+    {
+        return GraphicsQueue;
+    }
+    inline const vk::Queue &GetTransferQueue() const
+    {
+        return TransferQueue;
+    }
+    inline const vk::Queue &GetPresentQueue() const
+    {
+        return PresentQueue;
+    }
+    inline const vk::CommandPool &GetGraphicsCommandPool() const
+    {
+        return *GraphicsCommandPool;
+    }
+    inline const vk::CommandPool &GetTransferCommandPool() const
+    {
+        return *TransferCommandPool;
+    }
+    inline const vk::CommandPool &GetPresentCommandPool() const
+    {
+        return *PresentCommandPool;
+    }
+    inline const struct QueueFamilyIndicates &GetQueueFamilyIndicates() const
+    {
+        return QueueFamilyIndicates;
+    }
+    inline uint32_t GetVersion() const
+    {
+        return Version;
+    }
+
+  private:
+    void CreateInstance();
+    void PickPhysicalDevice();
+    void QueryQueueFamilyIndicates();
+    void CreateLogicalDevice();
+    void GetQueues();
+    void CreateCommandPools();
+
+  public:
+    VulkanContext(std::shared_ptr<VulkanContextConfig> config = nullptr);
+
+    void Init();
+
+    void SetSurface(const vk::SurfaceKHR &surface);
+    void Destroy();
+};
+
+} // namespace MEngine
