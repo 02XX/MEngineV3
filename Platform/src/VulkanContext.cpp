@@ -1,6 +1,7 @@
 #include "VulkanContext.hpp"
 #include "Logger.hpp"
 #include <set>
+#include <vulkan/vulkan_core.h>
 
 namespace MEngine
 {
@@ -20,6 +21,7 @@ void VulkanContext::Init()
     CreateLogicalDevice();
     GetQueues();
     CreateCommandPools();
+    CreateVMA();
 }
 
 void VulkanContext::Destroy()
@@ -272,5 +274,21 @@ void VulkanContext::CreateCommandPools()
         LogInfo("Present command pool created successfully");
     }
 }
-
+void VulkanContext::CreateVMA()
+{
+    VmaAllocatorCreateInfo allocatorCreateInfo{};
+    allocatorCreateInfo.device = Device.get();
+    allocatorCreateInfo.physicalDevice = PhysicalDevice;
+    allocatorCreateInfo.instance = Instance.get();
+    allocatorCreateInfo.flags =
+        VMA_ALLOCATOR_CREATE_KHR_DEDICATED_ALLOCATION_BIT | VMA_ALLOCATOR_CREATE_EXT_MEMORY_BUDGET_BIT;
+    auto variant = vk::apiVersionVariant(Version);
+    auto major = vk::apiVersionMajor(Version);
+    auto minor = vk::apiVersionMinor(Version);
+    auto patch = vk::apiVersionPatch(Version);
+    allocatorCreateInfo.vulkanApiVersion = VK_API_VERSION_1_3;
+    // allocatorCreateInfo.pVulkanFunctions = &vulkanFunctions;
+    vmaCreateAllocator(&allocatorCreateInfo, &VmaAllocator);
+    LogInfo("VMA Allocator created successfully");
+}
 } // namespace MEngine

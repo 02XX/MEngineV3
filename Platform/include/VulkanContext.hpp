@@ -1,8 +1,9 @@
 #pragma once
+#include "VMA.hpp"
 #include <memory>
 #include <optional>
 #include <vulkan/vulkan.hpp>
-#include <vulkan/vulkan_handles.hpp>
+
 
 namespace MEngine
 {
@@ -41,6 +42,9 @@ class VulkanContext
     vk::Queue TransferQueue;
     vk::Queue PresentQueue;
     uint32_t Version = 0;
+
+    // VMA
+    VmaAllocator VmaAllocator;
 
   public:
     inline const std::shared_ptr<VulkanContextConfig> &GetConfig() const
@@ -103,6 +107,7 @@ class VulkanContext
     void CreateLogicalDevice();
     void GetQueues();
     void CreateCommandPools();
+    void CreateVMA();
 
   public:
     VulkanContext(std::shared_ptr<VulkanContextConfig> config = nullptr);
