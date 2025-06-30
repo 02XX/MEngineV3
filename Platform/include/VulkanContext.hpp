@@ -4,7 +4,6 @@
 #include <optional>
 #include <vulkan/vulkan.hpp>
 
-
 namespace MEngine
 {
 struct VulkanContextConfig
@@ -17,10 +16,7 @@ struct VulkanContextConfig
 class VulkanContext
 {
   private:
-    // DI
-    std::shared_ptr<VulkanContextConfig> mConfig;
-
-  private:
+    VulkanContextConfig mConfig;
     // properties
     vk::UniqueInstance Instance;
     vk::PhysicalDevice PhysicalDevice;
@@ -33,6 +29,14 @@ class VulkanContext
         std::optional<uint32_t> transferFamily;
         std::optional<uint32_t> transferFamilyCount;
     } QueueFamilyIndicates;
+    struct SurfaceInfo
+    {
+        vk::SurfaceFormatKHR format;
+        vk::Extent2D extent;
+        vk::PresentModeKHR presentMode;
+        uint32_t imageCount;
+        uint32_t imageArrayLayer;
+    } SurfaceInfo;
     vk::UniqueDevice Device;
     vk::UniqueSurfaceKHR Surface;
     vk::UniqueCommandPool GraphicsCommandPool;
@@ -46,8 +50,13 @@ class VulkanContext
     // VMA
     VmaAllocator VmaAllocator;
 
+    // Swapchain
+    vk::UniqueSwapchainKHR mSwapchain;
+    std::vector<vk::Image> mSwapchainImages;
+    std::vector<vk::UniqueImageView> mSwapchainImageViews;
+
   public:
-    inline const std::shared_ptr<VulkanContextConfig> &GetConfig() const
+    inline const VulkanContextConfig &GetConfig() const
     {
         return mConfig;
     }
@@ -100,6 +109,27 @@ class VulkanContext
         return Version;
     }
 
+    inline const ::VmaAllocator &GetVmaAllocator() const
+    {
+        return VmaAllocator;
+    }
+    inline const vk::SwapchainKHR &GetSwapchain() const
+    {
+        return *mSwapchain;
+    }
+    inline const std::vector<vk::Image> &GetSwapchainImages() const
+    {
+        return mSwapchainImages;
+    }
+    inline const std::vector<vk::UniqueImageView> &GetSwapchainImageViews() const
+    {
+        return mSwapchainImageViews;
+    }
+    inline const struct SurfaceInfo &GetSurfaceInfo() const
+    {
+        return SurfaceInfo;
+    }
+
   private:
     void CreateInstance();
     void PickPhysicalDevice();
@@ -108,13 +138,19 @@ class VulkanContext
     void GetQueues();
     void CreateCommandPools();
     void CreateVMA();
+    void QuerySurfaceInfo();
+    void CreateSwapchain(vk::SwapchainKHR oldSwapchain = nullptr);
+    void RecreateSwapchain();
+    void CreateSwapchainImages();
+    void CreateSwapchainImageViews();
 
   public:
-    VulkanContext(std::shared_ptr<VulkanContextConfig> config = nullptr);
+    VulkanContext();
 
+    void InitContext(const VulkanContextConfig &config);
     void Init();
 
-    void SetSurface(const vk::SurfaceKHR &surface);
+    void InitSurface(const vk::SurfaceKHR &surface);
     void Destroy();
 };
 

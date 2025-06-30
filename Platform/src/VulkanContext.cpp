@@ -1,17 +1,15 @@
 #include "VulkanContext.hpp"
 #include "Logger.hpp"
 #include <set>
-#include <vulkan/vulkan_core.h>
-
 namespace MEngine
 {
 
-VulkanContext::VulkanContext(std::shared_ptr<VulkanContextConfig> config) : mConfig(config)
+VulkanContext::VulkanContext()
 {
-    if (!mConfig)
-    {
-        mConfig = std::make_shared<VulkanContextConfig>();
-    }
+}
+void VulkanContext::InitContext(const VulkanContextConfig &config)
+{
+    mConfig = config;
     CreateInstance();
     PickPhysicalDevice();
 }
@@ -22,8 +20,14 @@ void VulkanContext::Init()
     GetQueues();
     CreateCommandPools();
     CreateVMA();
+    if (Surface)
+    {
+        QuerySurfaceInfo();
+        CreateSwapchain();
+        CreateSwapchainImages();
+        CreateSwapchainImageViews();
+    }
 }
-
 void VulkanContext::Destroy()
 {
     GraphicsCommandPool.reset();
@@ -51,8 +55,8 @@ void VulkanContext::CreateInstance()
         .setApiVersion(Version);
     instanceCreateInfo.setFlags({})
         .setPApplicationInfo(&appInfo)
-        .setPEnabledLayerNames(mConfig->InstanceRequiredLayers)
-        .setPEnabledExtensionNames(mConfig->InstanceRequiredExtensions);
+        .setPEnabledLayerNames(mConfig.InstanceRequiredLayers)
+        .setPEnabledExtensionNames(mConfig.InstanceRequiredExtensions);
     Instance = vk::createInstanceUnique(instanceCreateInfo);
     if (!Instance)
     {
@@ -61,16 +65,16 @@ void VulkanContext::CreateInstance()
     }
     LogTrace("Vulkan instance created with version: {}.{}.{}.{}", variant, major, minor, patch);
     LogTrace("Vulkan instance extensions:");
-    for (const auto &ext : mConfig->InstanceRequiredExtensions)
+    for (const auto &ext : mConfig.InstanceRequiredExtensions)
     {
         LogTrace(" - {}", ext);
     }
     LogTrace("Vulkan instance layers:");
-    for (const auto &layer : mConfig->InstanceRequiredLayers)
+    for (const auto &layer : mConfig.InstanceRequiredLayers)
     {
         LogTrace(" - {}", layer);
     }
-    LogInfo("Vulkan instance created successfully");
+    LogDebug("Vulkan instance created successfully");
 }
 
 void VulkanContext::PickPhysicalDevice()
@@ -99,7 +103,7 @@ void VulkanContext::PickPhysicalDevice()
         throw std::runtime_error("No suitable physical device found");
     }
     PhysicalDevice = *bestDevice;
-    LogInfo("Selected physical device: {}", std::string(PhysicalDevice.getProperties().deviceName.data()));
+    LogDebug("Selected physical device: {}", std::string(PhysicalDevice.getProperties().deviceName.data()));
 }
 void VulkanContext::QueryQueueFamilyIndicates()
 {
@@ -128,21 +132,21 @@ void VulkanContext::QueryQueueFamilyIndicates()
             break;
         }
     }
-    LogInfo("Queue Family Indications:");
+    LogTrace("Queue Family Indications:");
     if (QueueFamilyIndicates.graphicsFamily.has_value())
     {
-        LogInfo(" - Graphics Family: {}, Count: {}", QueueFamilyIndicates.graphicsFamily.value(),
-                QueueFamilyIndicates.graphicsFamilyCount.value());
+        LogTrace(" - Graphics Family: {}, Count: {}", QueueFamilyIndicates.graphicsFamily.value(),
+                 QueueFamilyIndicates.graphicsFamilyCount.value());
     }
     if (QueueFamilyIndicates.presentFamily.has_value())
     {
-        LogInfo(" - Present Family: {}, Count: {}", QueueFamilyIndicates.presentFamily.value(),
-                QueueFamilyIndicates.presentFamilyCount.value());
+        LogTrace(" - Present Family: {}, Count: {}", QueueFamilyIndicates.presentFamily.value(),
+                 QueueFamilyIndicates.presentFamilyCount.value());
     }
     if (QueueFamilyIndicates.transferFamily.has_value())
     {
-        LogInfo(" - Transfer Family: {}, Count: {}", QueueFamilyIndicates.transferFamily.value(),
-                QueueFamilyIndicates.transferFamilyCount.value());
+        LogTrace(" - Transfer Family: {}, Count: {}", QueueFamilyIndicates.transferFamily.value(),
+                 QueueFamilyIndicates.transferFamilyCount.value());
     }
 }
 void VulkanContext::CreateLogicalDevice()
@@ -172,8 +176,8 @@ void VulkanContext::CreateLogicalDevice()
         queueCreateInfos.push_back(queueCreateInfo);
     }
     deviceCreateInfo.setQueueCreateInfos(queueCreateInfos)
-        .setPEnabledExtensionNames(mConfig->DeviceRequiredExtensions)
-        .setPEnabledLayerNames(mConfig->DeviceRequiredLayers)
+        .setPEnabledExtensionNames(mConfig.DeviceRequiredExtensions)
+        .setPEnabledLayerNames(mConfig.DeviceRequiredLayers)
         .setPEnabledFeatures(nullptr);
     Device = PhysicalDevice.createDeviceUnique(deviceCreateInfo);
     if (!Device)
@@ -181,9 +185,9 @@ void VulkanContext::CreateLogicalDevice()
         LogError("Failed to create Vulkan logical device");
         throw std::runtime_error("Failed to create Vulkan logical device");
     }
-    LogInfo("Vulkan logical device created successfully");
+    LogDebug("Vulkan logical device created successfully");
 }
-void VulkanContext::SetSurface(const vk::SurfaceKHR &surface)
+void VulkanContext::InitSurface(const vk::SurfaceKHR &surface)
 {
     Surface = vk::UniqueSurfaceKHR(surface, Instance.get());
     if (!Surface)
@@ -191,7 +195,7 @@ void VulkanContext::SetSurface(const vk::SurfaceKHR &surface)
         LogError("Failed to create Vulkan surface");
         throw std::runtime_error("Failed to create Vulkan surface");
     }
-    LogInfo("Vulkan surface set successfully");
+    LogDebug("Vulkan surface set successfully");
 }
 void VulkanContext::GetQueues()
 {
@@ -204,7 +208,7 @@ void VulkanContext::GetQueues()
             LogError("Failed to get graphics queue from Vulkan device");
             throw std::runtime_error("Failed to get graphics queue from Vulkan device");
         }
-        LogInfo("Graphics queue obtained successfully");
+        LogDebug("Graphics queue obtained successfully");
     }
     if (QueueFamilyIndicates.presentFamily.has_value())
     {
@@ -215,7 +219,7 @@ void VulkanContext::GetQueues()
             LogError("Failed to get present queue from Vulkan device");
             throw std::runtime_error("Failed to get present queue from Vulkan device");
         }
-        LogInfo("Present queue obtained successfully");
+        LogDebug("Present queue obtained successfully");
     }
     if (QueueFamilyIndicates.transferFamily.has_value())
     {
@@ -226,7 +230,7 @@ void VulkanContext::GetQueues()
             LogError("Failed to get transfer queue from Vulkan device");
             throw std::runtime_error("Failed to get transfer queue from Vulkan device");
         }
-        LogInfo("Transfer queue obtained successfully");
+        LogDebug("Transfer queue obtained successfully");
     }
 }
 
@@ -243,7 +247,7 @@ void VulkanContext::CreateCommandPools()
             LogError("Failed to create graphics command pool");
             throw std::runtime_error("Failed to create graphics command pool");
         }
-        LogInfo("Graphics command pool created successfully");
+        LogDebug("Graphics command pool created successfully");
     }
 
     if (QueueFamilyIndicates.transferFamily.has_value())
@@ -257,7 +261,7 @@ void VulkanContext::CreateCommandPools()
             LogError("Failed to create transfer command pool");
             throw std::runtime_error("Failed to create transfer command pool");
         }
-        LogInfo("Transfer command pool created successfully");
+        LogDebug("Transfer command pool created successfully");
     }
 
     if (QueueFamilyIndicates.presentFamily.has_value())
@@ -271,7 +275,7 @@ void VulkanContext::CreateCommandPools()
             LogError("Failed to create present command pool");
             throw std::runtime_error("Failed to create present command pool");
         }
-        LogInfo("Present command pool created successfully");
+        LogDebug("Present command pool created successfully");
     }
 }
 void VulkanContext::CreateVMA()
@@ -289,6 +293,164 @@ void VulkanContext::CreateVMA()
     allocatorCreateInfo.vulkanApiVersion = VK_API_VERSION_1_3;
     // allocatorCreateInfo.pVulkanFunctions = &vulkanFunctions;
     vmaCreateAllocator(&allocatorCreateInfo, &VmaAllocator);
-    LogInfo("VMA Allocator created successfully");
+    LogDebug("VMA Allocator created successfully");
+}
+void VulkanContext::QuerySurfaceInfo()
+{
+    auto formats = PhysicalDevice.getSurfaceFormatsKHR(Surface.get());
+    auto presentModes = PhysicalDevice.getSurfacePresentModesKHR(Surface.get());
+    auto capabilities = PhysicalDevice.getSurfaceCapabilitiesKHR(Surface.get());
+    std::vector<vk::SurfaceFormatKHR> candidatesFormats = {
+        {vk::Format::eR32G32B32A32Sfloat, vk::ColorSpaceKHR::eSrgbNonlinear},
+        {vk::Format::eR16G16B16A16Sfloat, vk::ColorSpaceKHR::eSrgbNonlinear},
+        {vk::Format::eR8G8B8A8Srgb, vk::ColorSpaceKHR::eSrgbNonlinear},
+        {vk::Format::eB8G8R8A8Srgb, vk::ColorSpaceKHR::eSrgbNonlinear},
+        {vk::Format::eR8G8B8A8Unorm, vk::ColorSpaceKHR::eSrgbNonlinear},
+        {vk::Format::eB8G8R8A8Unorm, vk::ColorSpaceKHR::eSrgbNonlinear},
+    };
+    std::vector<vk::PresentModeKHR> candidatesPresentModes = {
+        vk::PresentModeKHR::eMailbox,
+        vk::PresentModeKHR::eFifo,
+    };
+    bool formatFound = false;
+    bool presentModeFound = false;
+    SurfaceInfo.format = formats[0];
+    for (auto &format : candidatesFormats)
+    {
+        for (auto &supportFormat : formats)
+        {
+            if (format.format == supportFormat.format && format.colorSpace == supportFormat.colorSpace)
+            {
+                SurfaceInfo.format = format;
+                formatFound = true;
+                break;
+            }
+        }
+        if (formatFound)
+            break;
+    }
+    SurfaceInfo.presentMode = presentModes[0];
+    for (auto &presentMode : candidatesPresentModes)
+    {
+        for (auto &supportPresentMode : presentModes)
+        {
+            if (presentMode == supportPresentMode)
+            {
+                SurfaceInfo.presentMode = presentMode;
+                presentModeFound = true;
+                break;
+            }
+        }
+        if (presentModeFound)
+            break;
+    }
+    SurfaceInfo.extent = capabilities.currentExtent;
+    SurfaceInfo.imageCount = std::clamp(2u, capabilities.minImageCount, capabilities.maxImageCount);
+    SurfaceInfo.imageArrayLayer = std::clamp(1u, 1u, capabilities.maxImageArrayLayers);
+    // log
+    LogTrace("Current Surface Info:");
+    LogTrace("Support Image Count: {}~{}", capabilities.minImageCount, capabilities.maxImageCount);
+    LogTrace("Support Array Layer: 1~{}", capabilities.maxImageArrayLayers);
+    LogTrace("Support Transforms: {}", vk::to_string(capabilities.supportedTransforms));
+    LogTrace("Support Usage Flags: {}", vk::to_string(capabilities.supportedUsageFlags));
+    LogTrace("Support CompositeAlpha: {}", vk::to_string(capabilities.supportedCompositeAlpha));
+    LogTrace("Support Extent: {}x{}~{}x{}", capabilities.minImageExtent.width, capabilities.minImageExtent.height,
+             capabilities.maxImageExtent.width, capabilities.maxImageExtent.height);
+    for (auto &supportFormat : formats)
+    {
+        LogTrace("Support Format: {}", vk::to_string(supportFormat.format));
+    }
+    for (auto &supportPresentMode : presentModes)
+    {
+        LogTrace("Support Present Mode: {}", vk::to_string(supportPresentMode));
+    }
+    LogTrace("Current Format: {}", vk::to_string(SurfaceInfo.format.format));
+    LogTrace("Current Color Space: {}", vk::to_string(SurfaceInfo.format.colorSpace));
+    LogTrace("Current Present Mode: {}", vk::to_string(SurfaceInfo.presentMode));
+    LogTrace("Current Extent: {}x{}", capabilities.currentExtent.width, capabilities.currentExtent.height);
+    LogTrace("Current Image Count: {}", SurfaceInfo.imageCount);
+    LogTrace("Current Image Array Layer: {}", SurfaceInfo.imageArrayLayer);
+}
+void VulkanContext::CreateSwapchain(vk::SwapchainKHR oldSwapchain)
+{
+    vk::SwapchainCreateInfoKHR swapchainCreateInfo;
+    auto queueFamilyIndicates = QueueFamilyIndicates;
+    swapchainCreateInfo.setSurface(Surface.get())
+        .setClipped(true)
+        .setCompositeAlpha(vk::CompositeAlphaFlagBitsKHR::eOpaque)
+        .setImageArrayLayers(SurfaceInfo.imageArrayLayer)
+        .setMinImageCount(SurfaceInfo.imageCount)
+        .setImageColorSpace(SurfaceInfo.format.colorSpace)
+        .setImageExtent(SurfaceInfo.extent)
+        .setImageFormat(SurfaceInfo.format.format)
+        .setImageUsage(vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eTransferSrc |
+                       vk::ImageUsageFlagBits::eTransferDst)
+        .setPresentMode(SurfaceInfo.presentMode)
+        .setPreTransform(vk::SurfaceTransformFlagBitsKHR::eIdentity)
+        .setOldSwapchain(oldSwapchain);
+
+    if (queueFamilyIndicates.graphicsFamily == queueFamilyIndicates.presentFamily)
+    {
+        swapchainCreateInfo.setImageSharingMode(vk::SharingMode::eExclusive)
+            .setQueueFamilyIndices({queueFamilyIndicates.graphicsFamily.value()});
+    }
+    else
+    {
+        std::array<uint32_t, 2> queueFamilyIndicesArray = {queueFamilyIndicates.graphicsFamily.value(),
+                                                           queueFamilyIndicates.presentFamily.value()};
+        swapchainCreateInfo.setImageSharingMode(vk::SharingMode::eConcurrent)
+            .setQueueFamilyIndices(queueFamilyIndicesArray);
+    }
+
+    mSwapchain = Device->createSwapchainKHRUnique(swapchainCreateInfo);
+    if (!mSwapchain)
+    {
+        LogError("Failed to create swapchain");
+        throw std::runtime_error("Failed to create swapchain");
+    }
+    LogDebug("Swapchain created successfully");
+}
+void VulkanContext::RecreateSwapchain()
+{
+    Device->waitIdle();
+    QuerySurfaceInfo();
+    auto oldSwapchain = std::move(mSwapchain);
+    CreateSwapchain(oldSwapchain.get());
+    mSwapchainImageViews.clear();
+    mSwapchainImages.clear();
+    CreateSwapchainImages();
+    CreateSwapchainImageViews();
+    LogDebug("Swapchain Recreated");
+}
+void VulkanContext::CreateSwapchainImages()
+{
+    auto swapchainImages = Device->getSwapchainImagesKHR(mSwapchain.get());
+    for (auto &image : swapchainImages)
+    {
+        mSwapchainImages.push_back(image);
+    }
+    LogDebug("Swapchain Images Created");
+    LogTrace("Swapchain Image Count: {}", mSwapchainImages.size());
+}
+void VulkanContext::CreateSwapchainImageViews()
+{
+    for (auto image : mSwapchainImages)
+    {
+        vk::ImageViewCreateInfo imageViewCreateInfo;
+        imageViewCreateInfo.setImage(image)
+            .setViewType(vk::ImageViewType::e2D)
+            .setFormat(SurfaceInfo.format.format)
+            .setComponents(vk::ComponentMapping{})
+            .setSubresourceRange(vk::ImageSubresourceRange{vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1});
+        auto imageView = Device->createImageViewUnique(imageViewCreateInfo);
+        if (!imageView)
+        {
+            LogError("Failed to create image view for swapchain image");
+            throw std::runtime_error("Failed to create image view for swapchain image");
+        }
+        mSwapchainImageViews.push_back(std::move(imageView));
+    }
+    LogTrace("Swapchain Image Count: {}", mSwapchainImageViews.size());
+    LogDebug("Swapchain Image Views Created");
 }
 } // namespace MEngine
