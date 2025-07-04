@@ -2,7 +2,7 @@
 #include <cstddef>
 #include <stdexcept>
 
-namespace MEngine
+namespace MEngine::Core
 {
 UUID::UUID(const char *str)
 {
@@ -91,4 +91,4 @@ std::string UUID::ToString() const
     }
     return result;
 }
-} // namespace MEngine
+} // namespace MEngine::Core

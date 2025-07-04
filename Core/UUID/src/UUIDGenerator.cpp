@@ -2,7 +2,7 @@
 #include <chrono>
 #include <cstddef>
 #include <random>
-namespace MEngine
+namespace MEngine::Core
 {
 // https://datatracker.ietf.org/doc/html/rfc9562#name-example-of-a-uuidv7-value
 UUID UUIDGenerator::Create()
@@ -40,4 +40,4 @@ UUID UUIDGenerator::Create()
     // Create UUID from data
     return UUID(data);
 }
-} // namespace MEngine
+} // namespace MEngine::Core

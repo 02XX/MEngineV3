@@ -1,7 +1,7 @@
 #include "IUUIDGenerator.hpp"
 #include "UUID.hpp"
 
-namespace MEngine
+namespace MEngine::Core
 {
 class UUIDGenerator : public IUUIDGenerator
 {
@@ -9,4 +9,4 @@ class UUIDGenerator : public IUUIDGenerator
     ~UUIDGenerator() override = default;
     UUID Create() override;
 };
-} // namespace MEngine
+} // namespace MEngine::Core

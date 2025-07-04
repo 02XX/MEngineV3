@@ -2,7 +2,7 @@
 #include <array>
 #include <cstdint>
 #include <string>
-namespace MEngine
+namespace MEngine::Core
 {
 /**
  * @brief UUIDv7 https://www.rfc-editor.org/rfc/rfc9562.html#name-uuid-version-7
@@ -46,4 +46,28 @@ class UUID
         return !(*this == other);
     }
 };
-} // namespace MEngine
+} // namespace MEngine::Core
+
+namespace std
+{
+template <> struct hash<MEngine::Core::UUID>
+{
+    std::size_t operator()(const MEngine::Core::UUID &uuid) const noexcept
+    {
+        const auto &data = uuid.GetData();
+        std::size_t hash = 14695981039346656037ULL; // FNV-1a 64-bit prime
+
+        // Process 16 bytes in chunks for better performance
+        for (size_t i = 0; i < 16; i += 4)
+        {
+            // Combine 4 bytes at a time into a 32-bit chunk
+            uint32_t chunk = (static_cast<uint32_t>(data[i]) << 24) | (static_cast<uint32_t>(data[i + 1]) << 16) |
+                             (static_cast<uint32_t>(data[i + 2]) << 8) | static_cast<uint32_t>(data[i + 3]);
+            hash ^= chunk;
+            hash *= 1099511628211ULL; // FNV-1a 64-bit multiplier
+        }
+
+        return hash;
+    }
+};
+} // namespace std

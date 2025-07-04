@@ -1,6 +1,7 @@
+#pragma once
 #include "UUID.hpp"
 
-namespace MEngine
+namespace MEngine::Core
 {
 class IUUIDGenerator
 {
@@ -8,4 +9,4 @@ class IUUIDGenerator
     virtual ~IUUIDGenerator() = default;
     virtual UUID Create() = 0;
 };
-} // namespace MEngine
+} // namespace MEngine::Core
