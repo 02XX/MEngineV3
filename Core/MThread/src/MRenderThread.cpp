@@ -1,6 +1,6 @@
 #include "MRenderThread.hpp"
 
-namespace MEngine
+namespace MEngine::Core::Thread
 {
 
 void MRenderThread::Start()
@@ -48,4 +48,4 @@ MRenderThread &MRenderThread::GetInstance()
     return instance;
 }
 
-} // namespace MEngine
+} // namespace MEngine::Core::Thread

@@ -1,0 +1,19 @@
+{
+    "albedoTexture": "00000000-0000-0000-0000-000000000000",
+    "armTexture": "00000000-0000-0000-0000-000000000000",
+    "id": "90d2b649-25af-4f6c-9bf3-816c3c09cc70",
+    "name": "Cube",
+    "materialType": "PBR",
+    "normalTexture": "00000000-0000-0000-0000-000000000000",
+    "path": "E:\\Code\\MEngineGL\\build\\bin\\New PBRMaterial1.pbrmaterial",
+    "pbrProperties": {
+        "color": [
+            1.0,
+            1.0,
+            1.000
+        ],
+        "metallic": 0.0,
+        "roughness": 0.5
+    },
+    "pipelineID": "3af5b400-4002-49b5-9c3a-1343cf5bf78a"
+}

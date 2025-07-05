@@ -182,6 +182,21 @@ std::shared_ptr<MTexture> MTextureManager::Create(const MTextureSetting &setting
     }
     return texture;
 }
+void MTextureManager::Update(std::shared_ptr<MTexture> texture)
+{
+    auto newTexture = Create(texture->mSetting);
+    if (texture->mImage)
+    {
+        VkImage image = texture->mImage;
+        vmaDestroyImage(mVulkanContext->GetVmaAllocator(), image, texture->mAllocation);
+    }
+    texture->mImage = std::move(newTexture->mImage);
+    texture->mAllocation = std::move(newTexture->mAllocation);
+    texture->mAllocationInfo = std::move(newTexture->mAllocationInfo);
+    texture->mSampler = std::move(newTexture->mSampler);
+    texture->mImageView = std::move(newTexture->mImageView);
+    texture->mSetting = newTexture->mSetting;
+}
 void MTextureManager::Write(std::shared_ptr<MTexture> texture, const std::filesystem::path &path)
 {
     stbi_set_unpremultiply_on_load(true);

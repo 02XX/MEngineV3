@@ -1,7 +1,7 @@
 #pragma once
 #include "IMThread.hpp"
 #include <concurrentqueue/concurrentqueue.h>
-namespace MEngine
+namespace MEngine::Core::Thread
 {
 class MRenderThread final : public IMThread
 {
@@ -25,4 +25,4 @@ class MRenderThread final : public IMThread
     // Singleton
     static MRenderThread &GetInstance();
 };
-} // namespace MEngine
+} // namespace MEngine::Core::Thread

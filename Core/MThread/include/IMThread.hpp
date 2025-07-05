@@ -1,6 +1,6 @@
 #pragma once
 #include <functional>
-namespace MEngine
+namespace MEngine::Core::Thread
 {
 class IMThread
 {
@@ -12,4 +12,4 @@ class IMThread
     virtual bool IsRunning() const = 0;
     virtual void AddTask(const std::function<void()> &task) = 0;
 };
-} // namespace MEngine
+} // namespace MEngine::Core::Thread

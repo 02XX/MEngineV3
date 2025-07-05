@@ -24,6 +24,9 @@ class MPipelineManager final : public MManager<MPipeline, MPipelineSetting>, pub
     }
     ~MPipelineManager() override = default;
     std::shared_ptr<MPipeline> Create(const MPipelineSetting &setting) override;
+    void Update(std::shared_ptr<MPipeline> pipeline) override
+    {
+    }
     vk::UniqueShaderModule CreateShaderModule(const std::filesystem::path &shaderPath) const override;
 };
 } // namespace MEngine::Core::Manager
