@@ -3,6 +3,7 @@ add_subdirectory(MAsset)
 add_subdirectory(MThread)
 add_subdirectory(MManager)
 add_subdirectory(Utils)
+add_subdirectory(Math)
 
 add_library(Core INTERFACE)
-target_link_libraries(Core INTERFACE MAsset UUID MThread MManager Utils)
+target_link_libraries(Core INTERFACE MAsset UUID MThread MManager Utils Math)

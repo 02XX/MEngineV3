@@ -1,7 +1,6 @@
 #pragma once
 #include "IMManager.hpp"
 #include "MFolder.hpp"
-#include "MFolderSetting.hpp"
 
 using namespace MEngine::Core::Asset;
 namespace MEngine::Core::Manager

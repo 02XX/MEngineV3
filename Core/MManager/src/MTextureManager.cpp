@@ -121,7 +121,7 @@ MTextureManager::MTextureManager(std::shared_ptr<VulkanContext> vulkanContext,
 }
 std::shared_ptr<MTexture> MTextureManager::Create(const MTextureSetting &setting)
 {
-    auto texture = std::shared_ptr<MTexture>(new MTexture(mUUIDGenerator->Create(), mVulkanContext, setting));
+    auto texture = std::make_shared<MTexture>(mUUIDGenerator->Create(), mVulkanContext, setting);
     vk::ImageCreateInfo imageCreateInfo{};
     imageCreateInfo.setImageType(TextureTypeToImageType(texture->mSetting.ImageType))
         .setExtent({setting.width, setting.height, 1})
@@ -142,6 +142,7 @@ std::shared_ptr<MTexture> MTextureManager::Create(const MTextureSetting &setting
                        &texture->mAllocationInfo) != VK_SUCCESS)
     {
         LogError("Failed to create Vulkan image");
+        throw std::runtime_error("Failed to create Vulkan image");
     }
     vk::SamplerCreateInfo samplerCreateInfo{};
     samplerCreateInfo.setAddressModeU(texture->mSetting.addressModeU)

@@ -2,7 +2,7 @@
 #include "IMPipelineManager.hpp"
 #include "MManager.hpp"
 #include "MPipeline.hpp"
-#include "MPipelineSetting.hpp"
+
 #include "RenderPassManager.hpp"
 #include <memory>
 #include <vulkan/vulkan_handles.hpp>

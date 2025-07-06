@@ -2,7 +2,7 @@
 #include "IMFolderManager.hpp"
 #include "IUUIDGenerator.hpp"
 #include "MFolder.hpp"
-#include "MFolderSetting.hpp"
+
 #include "MManager.hpp"
 #include "VulkanContext.hpp"
 #include <memory>

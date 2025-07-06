@@ -12,6 +12,7 @@ enum class MAssetType
     Texture,
     Material,
     Mesh,
+    Model,
     Shader,
     Animation,
     Scene,
@@ -27,11 +28,14 @@ enum class MAssetState
     Unloaded,
     Loaded
 };
+class MAssetSetting
+{
+  public:
+    virtual ~MAssetSetting() = default;
+};
 class MAsset
 {
   protected:
-
-
   protected:
     UUID mID{};
     std::filesystem::path mPath{};
@@ -39,8 +43,7 @@ class MAsset
     MAssetType mType = MAssetType::Unknown;
 
   public:
-    MAsset(const UUID &id = UUID())
-        : mID(id)
+    MAsset(const UUID &id = UUID()) : mID(id)
     {
     }
     virtual ~MAsset() = default;

@@ -1,0 +1,14 @@
+#pragma once
+#include "IMManager.hpp"
+#include "MModel.hpp"
+#include <vulkan/vulkan_handles.hpp>
+using namespace MEngine::Core::Asset;
+namespace MEngine::Core::Manager
+{
+class IMModelManager : public IMManager<MModel, MModelSetting>
+{
+  public:
+    ~IMModelManager() override = default;
+    virtual std::shared_ptr<MModel> CreateCube() = 0;
+};
+} // namespace MEngine::Core::Manager

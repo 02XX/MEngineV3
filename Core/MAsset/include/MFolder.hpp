@@ -1,12 +1,16 @@
 #pragma once
 #include "MAsset.hpp"
-#include "MFolderSetting.hpp"
 #include "MManager_fwd.hpp"
 #include <memory>
 #include <nlohmann/json_fwd.hpp>
 namespace MEngine::Core::Asset
-
 {
+
+class MFolderSetting final : public MAssetSetting
+{
+  public:
+    ~MFolderSetting() override = default;
+};
 class MFolder : public MAsset
 {
     friend class nlohmann::adl_serializer<MFolder>;
