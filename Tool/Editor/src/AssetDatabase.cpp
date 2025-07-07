@@ -2,7 +2,7 @@
 #include "Logger.hpp"
 #include "MAsset.hpp"
 #include "MFolder.hpp"
-#include "MFolderSetting.hpp"
+
 #include "MPipeline.hpp"
 #include "MTexture.hpp"
 #include "Reflect.hpp"

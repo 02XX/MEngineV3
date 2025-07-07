@@ -1,6 +1,7 @@
 #pragma once
 #include "MMaterial.hpp"
 #include "MTexture.hpp"
+#include <memory>
 namespace MEngine::Core::Asset
 {
 class MPBRMaterialSetting final : public MMaterialSetting
@@ -8,10 +9,10 @@ class MPBRMaterialSetting final : public MMaterialSetting
 };
 struct MPBRTextures
 {
-    UUID AlbedoID{};
-    UUID NormalID{};
-    UUID ARMID{};
-    UUID EmissiveID{};
+    std::shared_ptr<MTexture> Albedo{};
+    std::shared_ptr<MTexture> Normal{};
+    std::shared_ptr<MTexture> ARM{};
+    std::shared_ptr<MTexture> Emissive{};
 };
 struct MPBRMaterialProperties
 {
@@ -26,6 +27,7 @@ class MPBRMaterial final : public MMaterial
   private:
     MPBRMaterialProperties mProperties;
     MPBRTextures mTextures;
+    vk::UniqueDescriptorSetLayout mDescriptorSetLayout;
 
   public:
     MPBRMaterial(const UUID &id, const MPBRMaterialSetting &setting)

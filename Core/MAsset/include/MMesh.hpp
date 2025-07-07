@@ -3,6 +3,7 @@
 #include "MManager_fwd.hpp"
 #include "VMA.hpp"
 #include "Vertex.hpp"
+#include <cstdint>
 #include <nlohmann/json_fwd.hpp>
 #include <vector>
 #include <vulkan/vulkan_handles.hpp>
@@ -88,6 +89,10 @@ class MMesh : public MAsset
     inline void SetSetting(const MMeshSetting &setting)
     {
         mSetting = setting;
+    }
+    inline uint32_t GetIndexCount() const
+    {
+        return static_cast<uint32_t>(mIndices.size());
     }
 };
 } // namespace MEngine::Core::Asset

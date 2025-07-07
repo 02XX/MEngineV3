@@ -112,7 +112,7 @@ std::shared_ptr<MPipeline> MPipelineManager::Create(const MPipelineSetting &sett
     dynamicStateInfo.setDynamicStates(dynamicStates);
     // ========== 10. 管线布局 ==========
     // ========== 11. 渲染通道 ==========
-    auto renderPass = mRenderPassManager->GetRenderPass(setting.mRenderPassType);
+    auto renderPass = mRenderPassManager->GetRenderPass(setting.RenderPassType);
     // ========== 12. 管线创建 ==========
     vk::GraphicsPipelineCreateInfo pipelineInfo{};
     pipelineInfo.setStageCount(static_cast<uint32_t>(shaderStages.size()))

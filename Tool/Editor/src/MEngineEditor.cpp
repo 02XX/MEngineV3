@@ -2,51 +2,89 @@
 #include "AssetDatabase.hpp"
 #include "Configure.hpp"
 #include "EditorSerialize.hpp"
+#include "IMMeshManager.hpp"
+#include "IMModelManager.hpp"
 #include "Logger.hpp"
 #include "MAsset.hpp"
+#include "MCameraComponent.hpp"
+#include "MCameraSystem.hpp"
 #include "MFolderManager.hpp"
+#include "MLightComponent.hpp"
+#include "MMaterialComponent.hpp"
+#include "MMeshComponent.hpp"
+#include "MMeshManager.hpp"
+#include "MModelManager.hpp"
+#include "MPBRMaterialManager.hpp"
 #include "MPipeline.hpp"
 #include "MPipelineManager.hpp"
+#include "MRenderSystem.hpp"
 #include "MTexture.hpp"
 #include "MTextureManager.hpp"
-#include "MTextureSetting.hpp"
+
+#include "EntityUtils.hpp"
+#include "ImageUtil.hpp"
+#include "MTransformComponent.hpp"
+#include "MTransformSystem.hpp"
+#include "Math.hpp"
 #include "RenderPassManager.hpp"
 #include "TaskManager.hpp"
 #include "UUIDGenerator.hpp"
 #include "VulkanContext.hpp"
 #include <boost/di.hpp>
 #include <cstddef>
+#include <cstdint>
+#include <entt/entt.hpp>
 #include <entt/meta/meta.hpp>
 #include <entt/meta/resolve.hpp>
 #include <filesystem>
+#include <functional>
+#include <glm/ext/matrix_transform.hpp>
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_vulkan.h>
 #include <imgui_internal.h>
 #include <memory>
+#include <vulkan/vulkan_enums.hpp>
 
 namespace MEngine::Editor
 {
 
 namespace DI = boost::di;
-auto injector = DI::make_injector(DI::bind<IConfigure>().to<Configure>().in(DI::unique),
-                                  DI::bind<VulkanContext>().to<VulkanContext>().in(DI::singleton),
-                                  DI::bind<AssetDatabase>().to<AssetDatabase>().in(DI::singleton),
-                                  DI::bind<ResourceManager>().to<ResourceManager>().in(DI::singleton),
-                                  DI::bind<IMTextureManager>().to<MTextureManager>().in(DI::singleton),
-                                  DI::bind<IMFolderManager>().to<MFolderManager>().in(DI::singleton),
-                                  DI::bind<IMPipelineManager>().to<MPipelineManager>().in(DI::singleton),
-                                  DI::bind<RenderPassManager>().to<RenderPassManager>().in(DI::singleton),
-                                  DI::bind<IUUIDGenerator>().to<UUIDGenerator>().in(DI::singleton));
+auto injector = DI::make_injector(
+
+    DI::bind<IConfigure>().to<Configure>().in(DI::unique),
+    DI::bind<VulkanContext>().to<VulkanContext>().in(DI::singleton),
+    DI::bind<AssetDatabase>().to<AssetDatabase>().in(DI::singleton),
+    DI::bind<ResourceManager>().to<ResourceManager>().in(DI::singleton),
+    DI::bind<IMTextureManager>().to<MTextureManager>().in(DI::singleton),
+    DI::bind<IMFolderManager>().to<MFolderManager>().in(DI::singleton),
+    DI::bind<IMPipelineManager>().to<MPipelineManager>().in(DI::singleton),
+    DI::bind<IMModelManager>().to<MModelManager>().in(DI::singleton),
+    DI::bind<IMMeshManager>().to<MMeshManager>().in(DI::singleton),
+    DI::bind<IMPBRMaterialManager>().to<MPBRMaterialManager>().in(DI::singleton),
+    DI::bind<RenderPassManager>().to<RenderPassManager>().in(DI::singleton),
+    DI::bind<IUUIDGenerator>().to<UUIDGenerator>().in(DI::singleton),
+    DI::bind<entt::registry>().to<entt::registry>().in(DI::singleton),
+    DI::bind<MRenderSystem>().to<MRenderSystem>().in(DI::singleton),
+    DI::bind<MTransformSystem>().to<MTransformSystem>().in(DI::singleton),
+    DI::bind<MCameraSystem>().to<MCameraSystem>().in(DI::singleton)
+
+);
 void MEngineEditor::Init()
 {
+
     InitWindow();
     InitVulkan();
     InitImGui();
     InitDataBase();
     RegisterMeta();
-
+    InitEditorCamera();
+    InitSystem();
     mIsRunning = true;
+    auto modelManager = injector.create<std::shared_ptr<IMModelManager>>();
+    auto cube = modelManager->CreateCube();
+    auto registry = injector.create<std::shared_ptr<entt::registry>>();
+    auto cubeGameObject = Function::Utils::EntityUtils::CreateEntity(registry, cube);
     LogInfo("MEngine Editor initialized successfully");
 }
 void MEngineEditor::InitWindow()
@@ -157,7 +195,10 @@ void MEngineEditor::InitImGui()
         textureSetting.width = 200;
         textureSetting.height = 200;
         mAssetIconTextures[type] = textureManager->Create(textureSetting);
-        textureManager->Write(mAssetIconTextures[type], path);
+        auto [W, H, C, data] = Utils::ImageUtil::LoadImage(path);
+        textureManager->Write(
+            mAssetIconTextures[type], data,
+            TextureSize{static_cast<uint32_t>(W), static_cast<uint32_t>(H), static_cast<uint32_t>(C)});
         mAssetIcons[type] = ImGui_ImplVulkan_AddTexture(
             mAssetIconTextures[type]->GetSampler(), mAssetIconTextures[type]->GetImageView(),
             static_cast<VkImageLayout>(vk::ImageLayout::eShaderReadOnlyOptimal));
@@ -171,24 +212,68 @@ void MEngineEditor::InitImGui()
     loadIcon("Assets/Icons/audio.png", MAssetType::Audio);
     loadIcon("Assets/Icons/animation.png", MAssetType::Animation);
     loadIcon("Assets/Icons/script.png", MAssetType::Script);
+
+    ImGuizmo::SetImGuiContext(ImGui::GetCurrentContext());
+    ImGuizmo::Enable(true);
     LogDebug("Initializing ImGui with Vulkan");
 }
 void MEngineEditor::InitDataBase()
 {
-    auto resourceManager = injector.create<std::shared_ptr<ResourceManager>>();
-    auto textureManager = injector.create<std::shared_ptr<IMTextureManager>>();
-    auto folderManager = injector.create<std::shared_ptr<IMFolderManager>>();
-    auto pipelineManager = injector.create<std::shared_ptr<IMPipelineManager>>();
-    resourceManager->RegisterManager(std::static_pointer_cast<IMManager<MTexture, MTextureSetting>>(textureManager));
-    resourceManager->RegisterManager(std::static_pointer_cast<IMManager<MFolder, MFolderSetting>>(folderManager));
-    resourceManager->RegisterManager(std::static_pointer_cast<IMManager<MPipeline, MPipelineSetting>>(pipelineManager));
     mAssetDatabase = injector.create<std::shared_ptr<AssetDatabase>>();
     mRootFolder = mAssetDatabase->LoadDatabase(mProjectPath);
     mCurrentFolder = mRootFolder;
 }
+void MEngineEditor::InitEditorCamera()
+{
+    auto registry = injector.create<std::shared_ptr<entt::registry>>();
+    mEditorCameraEntity = registry->create();
+    auto &cameraMTransformComponent =
+        registry->emplace<MTransformComponent>(mEditorCameraEntity, MTransformComponent{});
+    cameraMTransformComponent.name = "EditorCamera";
+    cameraMTransformComponent.localPosition = glm::vec3(0.0f, 0.0f, 5.0f);
+    auto &cameraComponent = registry->emplace<MCameraComponent>(mEditorCameraEntity, MCameraComponent{});
+    cameraComponent.isEditorCamera = true;
+    cameraComponent.isMainCamera = true;
+}
+void MEngineEditor::InitSystem()
+{
+    auto cameraSystem = injector.create<std::shared_ptr<MCameraSystem>>();
+    cameraSystem->Init();
+    auto transformSystem = injector.create<std::shared_ptr<MTransformSystem>>();
+    transformSystem->Init();
+
+    mRenderSystem = injector.create<std::shared_ptr<MRenderSystem>>();
+    mRenderSystem->SetFrameCount(mFrameCount);
+    mRenderSystem->SetExtent(800, 600);
+    mRenderSystem->Init();
+    mViewPortDescriptorSets.resize(mFrameCount);
+    for (uint32_t i = 0; i < mFrameCount; ++i)
+    {
+        auto &renderTarget = mRenderSystem->GetRenderTarget(i);
+        mViewPortDescriptorSets[i] = ImGui_ImplVulkan_AddTexture(
+            renderTarget.colorTexture->GetSampler(), renderTarget.colorTexture->GetImageView(),
+            static_cast<VkImageLayout>(vk::ImageLayout::eShaderReadOnlyOptimal));
+    }
+}
 void MEngineEditor::Run(float deltaTime)
 {
     auto vulkanContext = injector.create<std::shared_ptr<VulkanContext>>();
+    auto cameraSystem = injector.create<std::shared_ptr<MCameraSystem>>();
+    auto transformSystem = injector.create<std::shared_ptr<MTransformSystem>>();
+    // auto cameraSystemTask = mTaskflow.emplace([this, cameraSystem, deltaTime]() {
+    //     while (mIsRunning)
+    //     {
+    //         cameraSystem->Update(deltaTime);
+    //     }
+    // });
+    // auto transformSystemTask = mTaskflow.emplace([this, transformSystem, deltaTime]() {
+    //     while (mIsRunning)
+    //     {
+    //         transformSystem->Update(deltaTime);
+    //     }
+    // });
+    auto &executor = Thread::TaskManager::GetExecutor();
+    executor.run(mTaskflow);
     while (!glfwWindowShouldClose(mWindow))
     {
         glfwPollEvents();
@@ -214,10 +299,28 @@ void MEngineEditor::Run(float deltaTime)
         UI();
         if (mIsRunning)
         {
+            transformSystem->Update(deltaTime);
+            cameraSystem->Update(deltaTime);
+            mRenderSystem->Update(deltaTime);
         }
+
         ImGui::Render();
         mUICmdBuffers[mCurrentFrameIndex]->reset();
         mUICmdBuffers[mCurrentFrameIndex]->begin({vk::CommandBufferUsageFlagBits::eOneTimeSubmit});
+        // 转换图像布局
+        auto &renderTarget = mRenderSystem->GetRenderTarget(mCurrentFrameIndex);
+        vk::ImageMemoryBarrier preBarrier;
+        preBarrier.setImage(renderTarget.colorTexture->GetImage())
+            .setOldLayout(vk::ImageLayout::eColorAttachmentOptimal)
+            .setNewLayout(vk::ImageLayout::eShaderReadOnlyOptimal)
+            .setSrcQueueFamilyIndex(vulkanContext->GetQueueFamilyIndicates().graphicsFamily.value())
+            .setDstQueueFamilyIndex(vulkanContext->GetQueueFamilyIndicates().graphicsFamily.value())
+            .setSubresourceRange(vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1))
+            .setSrcAccessMask(vk::AccessFlagBits::eColorAttachmentWrite)
+            .setDstAccessMask(vk::AccessFlagBits::eShaderRead);
+        mUICmdBuffers[mCurrentFrameIndex]->pipelineBarrier(vk::PipelineStageFlagBits::eColorAttachmentOutput,
+                                                           vk::PipelineStageFlagBits::eFragmentShader, {}, {}, {},
+                                                           preBarrier);
         vk::RenderPassBeginInfo renderPassInfo{};
         renderPassInfo.setRenderPass(mUIRenderPass.get())
             .setFramebuffer(mUIFramebuffers[mCurrentFrameIndex].get())
@@ -228,20 +331,38 @@ void MEngineEditor::Run(float deltaTime)
         mUICmdBuffers[mCurrentFrameIndex]->beginRenderPass(renderPassInfo, vk::SubpassContents::eInline);
         ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), mUICmdBuffers[mCurrentFrameIndex].get());
         mUICmdBuffers[mCurrentFrameIndex]->endRenderPass();
+        vk::ImageMemoryBarrier postBarrier;
+        postBarrier.setImage(renderTarget.colorTexture->GetImage())
+            .setOldLayout(vk::ImageLayout::eShaderReadOnlyOptimal)
+            .setNewLayout(vk::ImageLayout::eColorAttachmentOptimal)
+            .setSrcQueueFamilyIndex(vulkanContext->GetQueueFamilyIndicates().graphicsFamily.value())
+            .setDstQueueFamilyIndex(vulkanContext->GetQueueFamilyIndicates().graphicsFamily.value())
+            .setSubresourceRange(vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1))
+            .setSrcAccessMask(vk::AccessFlagBits::eShaderRead)
+            .setDstAccessMask(vk::AccessFlagBits::eColorAttachmentWrite);
+        mUICmdBuffers[mCurrentFrameIndex]->pipelineBarrier(vk::PipelineStageFlagBits::eFragmentShader,
+                                                           vk::PipelineStageFlagBits::eColorAttachmentOutput, {}, {},
+                                                           {}, postBarrier);
         mUICmdBuffers[mCurrentFrameIndex]->end();
         vk::SubmitInfo submitInfo;
-        vk::PipelineStageFlags waitStage = vk::PipelineStageFlagBits::eColorAttachmentOutput;
+
+        auto waitSemaphores = {mImageAvailableSemaphores[mCurrentFrameIndex].get(),
+                               mRenderSystem->GetRenderFinishedSemaphore(mCurrentFrameIndex)};
+        auto signalSemaphores = {mRenderFinishedSemaphores[mCurrentFrameIndex].get()};
+        std::vector<vk::PipelineStageFlags> waitStage = {vk::PipelineStageFlagBits::eColorAttachmentOutput,
+                                                         vk::PipelineStageFlagBits::eFragmentShader};
         submitInfo.setCommandBuffers(mUICmdBuffers[mCurrentFrameIndex].get())
-            .setSignalSemaphores(mRenderFinishedSemaphores[mCurrentFrameIndex].get())
-            .setWaitSemaphores(mImageAvailableSemaphores[mCurrentFrameIndex].get())
+            .setSignalSemaphores(signalSemaphores)
+            .setWaitSemaphores(waitSemaphores)
             .setWaitDstStageMask({waitStage});
 
         vulkanContext->GetGraphicsQueue().submit(submitInfo, mInFlightFences[mCurrentFrameIndex].get());
 
         vk::PresentInfoKHR presentInfo;
+        auto presentWaitSemaphores = {mRenderFinishedSemaphores[mCurrentFrameIndex].get()};
         presentInfo.setSwapchains(vulkanContext->GetSwapchain())
             .setImageIndices({resultValue.value})
-            .setWaitSemaphores(mRenderFinishedSemaphores[mCurrentFrameIndex].get());
+            .setWaitSemaphores(presentWaitSemaphores);
         auto presentResult = vulkanContext->GetPresentQueue().presentKHR(presentInfo);
         if (presentResult == vk::Result::eErrorOutOfDateKHR || presentResult == vk::Result::eSuboptimalKHR)
         {
@@ -253,6 +374,8 @@ void MEngineEditor::Run(float deltaTime)
         }
         mCurrentFrameIndex = (mCurrentFrameIndex + 1) % mFrameCount;
     }
+    // executor.wait_for_all();
+    LogDebug("MEngine Editor run loop exited");
 }
 void MEngineEditor::Shutdown()
 {
@@ -440,18 +563,224 @@ void MEngineEditor::UI()
 void MEngineEditor::RenderToolbarPanel()
 {
     ImGui::Begin("Toolbar", nullptr, ImGuiWindowFlags_None);
+    ImGui::BeginGroup();
+    {
+        auto sceneWindow = ImGui::FindWindowByName("Viewport");
+        ImGui::Text("SceneView Size: %1.f x %1.f", sceneWindow->ContentSize.x, sceneWindow->ContentSize.y);
+        ImGui::SameLine();
+        ImGui::TextColored(ImVec4(1, 1, 0, 1), "FPS: %1.f", ImGui::GetIO().Framerate);
+        if (ImGui::RadioButton("Translate", mGuizmoOperation == ImGuizmo::TRANSLATE) || ImGui::IsKeyDown(ImGuiKey_W))
+            mGuizmoOperation = ImGuizmo::TRANSLATE;
+        ImGui::SameLine();
+        if (ImGui::RadioButton("Rotate", mGuizmoOperation == ImGuizmo::ROTATE) || ImGui::IsKeyDown(ImGuiKey_E))
+            mGuizmoOperation = ImGuizmo::ROTATE;
+        ImGui::SameLine();
+        if (ImGui::RadioButton("Scale", mGuizmoOperation == ImGuizmo::SCALE) || ImGui::IsKeyDown(ImGuiKey_R))
+            mGuizmoOperation = ImGuizmo::SCALE;
+        if (ImGui::RadioButton("Local", mGuizmoMode == ImGuizmo::LOCAL))
+            mGuizmoMode = ImGuizmo::LOCAL;
+        ImGui::SameLine();
+        if (ImGui::RadioButton("World", mGuizmoMode == ImGuizmo::WORLD))
+            mGuizmoMode = ImGuizmo::WORLD;
+        ImGui::EndGroup();
+    }
+    // ImGui::BeginGroup();
+    // {
+    //     if (ImGui::BeginCombo("Resolution", mCurrentResolution.ToString().c_str()))
+    //     {
+    //         for (Resolution &resolution : mResolutions)
+    //         {
+    //             if (ImGui::Selectable(resolution.ToString().data(), mCurrentResolution == resolution))
+    //             {
+    //                 mCurrentResolution = resolution;
+    //                 mRenderSystem->CreateFrameBuffer(resolution.width, resolution.height);
+    //                 auto &cameraComponent = registry->get<CameraComponent>(mEditorCamera);
+    //                 if (cameraComponent.isMainCamera)
+    //                 {
+    //                     cameraComponent.aspectRatio = static_cast<float>(resolution.width) / resolution.height;
+    //                     cameraComponent.dirty = true;
+    //                     break;
+    //                 }
+    //             }
+    //         }
+    //         ImGui::EndCombo();
+    //     }
+    //     ImGui::EndGroup();
+    // }
     ImGui::End();
 }
 void MEngineEditor::RenderViewportPanel()
 {
     ImGui::Begin("Viewport", nullptr, ImGuiWindowFlags_None);
-    ImGui::Text("Viewport Panel");
+    ImVec2 windowPos = ImGui::GetWindowPos();
+    ImVec2 windowSize = ImGui::GetContentRegionAvail();
+    ImGui::Image(reinterpret_cast<ImTextureID>(mViewPortDescriptorSets[mCurrentFrameIndex]), windowSize);
+    // 设置 ImGuizmo 绘制区域
+    ImVec2 imagePos = ImGui::GetItemRectMin();
+    ImVec2 imageSize = ImGui::GetItemRectSize();
+    ImGuizmo::SetRect(imagePos.x, imagePos.y, imageSize.x, imageSize.y);
+    ImGuizmo::SetDrawlist(ImGui::GetWindowDrawList());
+    if (mSelectedEntity != entt::null)
+    {
+        auto registry = injector.create<std::shared_ptr<entt::registry>>();
+        if (registry->any_of<MTransformComponent>(mSelectedEntity))
+        {
+            auto &transform = registry->get<MTransformComponent>(mSelectedEntity);
+            auto &cameraComponent = registry->get<MCameraComponent>(mEditorCameraEntity);
+            auto modelMatrix = transform.modelMatrix;
+            auto viewMatrix = cameraComponent.viewMatrix;
+            auto projectionMatrix = cameraComponent.projectionMatrix;
+            ImGuizmo::Manipulate(glm::value_ptr(viewMatrix), glm::value_ptr(projectionMatrix), mGuizmoOperation,
+                                 mGuizmoMode, glm::value_ptr(modelMatrix));
+            if (ImGuizmo::IsUsing())
+            {
+                // 分解矩阵
+                glm::vec3 translation, scale, skew;
+                glm::quat rotation;
+                glm::vec4 perspective;
+                if (glm::decompose(modelMatrix, scale, rotation, translation, skew, perspective))
+                {
+                    transform.localPosition = translation;
+                    transform.localRotation = rotation;
+                    transform.localScale = scale;
+
+                    transform.dirty = true;
+                }
+            }
+        }
+    }
     ImGui::End();
 }
 void MEngineEditor::RenderHierarchyPanel()
 {
     ImGui::Begin("Hierarchy", nullptr, ImGuiWindowFlags_None);
+    auto registry = injector.create<std::shared_ptr<entt::registry>>();
+    ImGui::BeginChild("HierarchyList");
+    {
+        std::function<void(const entt::entity &)> renderEntity = [this, &renderEntity,
+                                                                  registry](const entt::entity &entity) {
+            auto &transform = registry->get<MTransformComponent>(entity);
+            std::string name = transform.name;
+            ImGuiTreeNodeFlags flags =
+                ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_SpanAvailWidth | ImGuiTreeNodeFlags_DefaultOpen;
+            if (transform.children.empty())
+            {
+                flags |= ImGuiTreeNodeFlags_Leaf;
+            }
+            bool isSelected = (mSelectedEntity == entity);
+            // 如果选中，设置背景色
+            if (isSelected)
+            {
+                ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(0.2f, 0.3f, 0.8f, 1.0f));        // 选中时的背景色
+                ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0.3f, 0.4f, 0.9f, 1.0f)); // 悬停时的背景色
+                ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImVec4(0.2f, 0.3f, 0.8f, 1.0f));  // 激活时的背景色
+                flags |= ImGuiTreeNodeFlags_Selected;
+            }
+            bool opened = ImGui::TreeNodeEx((void *)(uint64_t)entity, flags, "%s", name.data());
+            if (isSelected)
+            {
+                ImGui::PopStyleColor(3);
+            }
+            if (ImGui::IsItemClicked() && !ImGui::IsItemToggledOpen())
+            {
+                mSelectedEntity = entity;
+            }
+            if (ImGui::IsItemHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
+            {
+                mSelectedEntity = entity;
+            }
+            if (ImGui::BeginDragDropSource())
+            {
+                ImGui::SetDragDropPayload("ENTITY_DRAG_DROP", &entity, sizeof(entt::entity));
+                ImGui::Text("Move %s", name.data());
+                ImGui::EndDragDropSource();
+            }
+            if (ImGui::BeginDragDropTarget())
+            {
+                if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload("ENTITY_DRAG_DROP"))
+                {
+                    IM_ASSERT(payload->DataSize == sizeof(entt::entity));
+                    entt::entity draggedAsset = *(const entt::entity *)payload->Data;
 
+                    // 重新设置父子关系
+                    auto &draggedTransform = registry->get<MTransformComponent>(draggedAsset);
+                    auto &targetTransform = registry->get<MTransformComponent>(entity);
+                    // 判断拖拽实体是否已经是目标实体的后继节点
+                    MTransformComponent targetTransformRoot = targetTransform;
+                    bool isDescendant = false;
+                    while (targetTransformRoot.parent != entt::null)
+                    {
+                        if (targetTransformRoot.parent == draggedAsset)
+                        {
+                            isDescendant = true;
+                            break;
+                        }
+                        targetTransformRoot = registry->get<MTransformComponent>(targetTransformRoot.parent);
+                    }
+                    if (!isDescendant)
+                    {
+                        // 移除拖拽实体的父节点
+                        if (draggedTransform.parent != entt::null)
+                        {
+                            auto &parentTransform = registry->get<MTransformComponent>(draggedTransform.parent);
+                            auto it = std::find(parentTransform.children.begin(), parentTransform.children.end(),
+                                                draggedAsset);
+                            if (it != parentTransform.children.end())
+                            {
+                                parentTransform.children.erase(it);
+                            }
+                        }
+                        // 设置新的父节点
+                        draggedTransform.parent = entity;
+                        targetTransform.children.push_back(draggedAsset);
+                    }
+                }
+                ImGui::EndDragDropTarget();
+            }
+
+            // 递归绘制子节点
+            if (opened)
+            {
+                for (auto child : transform.children)
+                {
+                    renderEntity(child);
+                }
+                ImGui::TreePop();
+            }
+        };
+        auto view = registry->view<MTransformComponent>();
+        std::vector<entt::entity> rootEntities;
+        for (auto entity : view)
+        {
+            auto &transform = view.get<MTransformComponent>(entity);
+            if (transform.parent == entt::null)
+            {
+                rootEntities.push_back(entity);
+            }
+        }
+        for (auto entity : rootEntities)
+        {
+            renderEntity(entity);
+        }
+        // 右键菜单
+        if (ImGui::BeginPopupContextWindow("HierarchyContextMenu", ImGuiPopupFlags_MouseButtonRight))
+        {
+            if (ImGui::MenuItem("Create Empty"))
+            {
+                auto entity = registry->create();
+                auto &transform = registry->emplace<MTransformComponent>(entity);
+            }
+            if (mSelectedEntity != entt::null && registry->valid(mSelectedEntity))
+            {
+                if (ImGui::MenuItem("Delete"))
+                {
+                    // mSelectedEntity = entt::null;
+                }
+            }
+            ImGui::EndPopup();
+        }
+    }
+    ImGui::EndChild();
     ImGui::End();
 }
 void MEngineEditor::RenderInspectorPanel()
@@ -462,6 +791,41 @@ void MEngineEditor::RenderInspectorPanel()
         if (ImGui::BeginTabItem("Components"))
         {
             ImGui::Text("Components Panel");
+            auto registry = injector.create<std::shared_ptr<entt::registry>>();
+            if (mSelectedEntity != entt::null && registry->valid(mSelectedEntity))
+            {
+                auto registry = injector.create<std::shared_ptr<entt::registry>>();
+                if (registry->any_of<MTransformComponent>(mSelectedEntity))
+                {
+                    auto &transform = registry->get<MTransformComponent>(mSelectedEntity);
+                    auto metaTransform = entt::forward_as_meta(transform);
+                    ReflectObject(metaTransform, entt::resolve<MTransformComponent>());
+                }
+                if (registry->any_of<MCameraComponent>(mSelectedEntity))
+                {
+                    auto &camera = registry->get<MCameraComponent>(mSelectedEntity);
+                    auto metaCamera = entt::forward_as_meta(camera);
+                    ReflectObject(metaCamera, entt::resolve<MCameraComponent>());
+                }
+                if (registry->any_of<MMeshComponent>(mSelectedEntity))
+                {
+                    auto &mesh = registry->get<MMeshComponent>(mSelectedEntity);
+                    auto metaMesh = entt::forward_as_meta(mesh);
+                    ReflectObject(metaMesh, entt::resolve<MMeshComponent>());
+                }
+                if (registry->any_of<MMaterialComponent>(mSelectedEntity))
+                {
+                    auto &material = registry->get<MMaterialComponent>(mSelectedEntity);
+                    auto metaMaterial = entt::forward_as_meta(material);
+                    ReflectObject(metaMaterial, entt::resolve<MMaterialComponent>());
+                }
+                if (registry->any_of<MLightComponent>(mSelectedEntity))
+                {
+                    auto &light = registry->get<MLightComponent>(mSelectedEntity);
+                    auto metaLight = entt::forward_as_meta(light);
+                    ReflectObject(metaLight, entt::resolve<MLightComponent>());
+                }
+            }
             ImGui::EndTabItem();
         }
         if (ImGui::BeginTabItem("Assets"))
@@ -631,10 +995,6 @@ void MEngineEditor::ReflectObject(entt::meta_any &instance, entt::meta_type type
     auto instanceName = info->DisplayName;
     if (ImGui::CollapsingHeader(instanceName.data(), ImGuiTreeNodeFlags_DefaultOpen))
     {
-        for (auto &&[id, baseType] : type.base())
-        {
-            ReflectObject(instance, baseType);
-        }
         for (auto &&[id, field] : type.data())
         {
             auto fieldInfo = static_cast<Info *>(field.custom());
@@ -693,12 +1053,50 @@ void MEngineEditor::ReflectObject(entt::meta_any &instance, entt::meta_type type
                 auto value = fieldValue.cast<UUID>().ToString();
                 ImGui::Text("%s: %s", fieldName, value.c_str());
             }
+            else if (fieldType == entt::resolve<glm::vec2>())
+            {
+                auto value = fieldValue.cast<glm::vec2>();
+                if (ImGui::DragFloat2(fieldName, glm::value_ptr(value), 0.01f))
+                {
+                    field.set(instance, value);
+                }
+            }
+            else if (fieldType == entt::resolve<glm::vec3>())
+            {
+                auto value = fieldValue.cast<glm::vec3>();
+                if (ImGui::DragFloat3(fieldName, glm::value_ptr(value), 0.01f))
+                {
+                    field.set(instance, value);
+                }
+            }
+            else if (fieldType == entt::resolve<glm::vec4>())
+            {
+                auto value = fieldValue.cast<glm::vec4>();
+                if (ImGui::DragFloat4(fieldName, glm::value_ptr(value), 0.01f))
+                {
+                    field.set(instance, value);
+                }
+            }
+            else if (fieldType == entt::resolve<glm::quat>())
+            {
+                auto value = fieldValue.cast<glm::quat>();
+                glm::vec3 euler = glm::degrees(glm::eulerAngles(value));
+                if (ImGui::DragFloat3(fieldName, glm::value_ptr(euler), 0.01f))
+                {
+                    value = glm::quat(glm::radians(euler));
+                    field.set(instance, value);
+                }
+            }
             else
             {
                 ImGui::Text("%s: %s", fieldName, fieldType.info().name().data());
             }
             if (!fieldInfo->Editable)
                 ImGui::EndDisabled();
+        }
+        for (auto &&[id, baseType] : type.base())
+        {
+            ReflectObject(instance, baseType);
         }
     }
 }

@@ -25,7 +25,7 @@ class MPipelineSetting final : public MAssetSetting
     std::filesystem::path VertexShaderPath;
     std::filesystem::path FragmentShaderPath;
     // RenderPass
-    RenderPassType mRenderPassType = RenderPassType::ForwardComposition;
+    RenderPassType RenderPassType = RenderPassType::ForwardComposition;
 
     //========== 5. 光栅化状态 ==========
     bool DepthClampEnable = false;
@@ -58,7 +58,7 @@ class MPipelineSetting final : public MAssetSetting
     std::vector<std::vector<vk::DescriptorSetLayoutBinding>> DescriptorSetLayoutBindings{
         // set:0
         {{
-            // binding: 0 Camera
+            // binding: 0 MVP
             vk::DescriptorSetLayoutBinding{0, vk::DescriptorType::eUniformBuffer, 1,
                                            vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
             // binding: 1 Light
@@ -89,12 +89,10 @@ class MPipeline : public MAsset
     friend class Manager::MPipelineManager;
 
   private:
-    MPipelineSetting mSetting;
-
+    MPipelineSetting mSetting{};
     // vulkan
     vk::UniqueShaderModule mVertexShaderModule;
     vk::UniqueShaderModule mFragmentShaderModule;
-    std::vector<vk::UniqueDescriptorSetLayout> mDescriptorSetLayouts;
     vk::UniquePipelineLayout mPipelineLayout;
     vk::UniquePipeline mPipeline;
 
@@ -129,11 +127,6 @@ class MPipeline : public MAsset
     inline const vk::PipelineLayout GetPipelineLayout() const
     {
         return mPipelineLayout.get();
-    }
-    inline const std::vector<vk::DescriptorSetLayout> GetDescriptorSetLayouts() const
-    {
-        return mDescriptorSetLayouts | std::ranges::views::transform([](const auto &layout) { return layout.get(); }) |
-               std::ranges::to<std::vector<vk::DescriptorSetLayout>>();
     }
 };
 } // namespace MEngine::Core::Asset

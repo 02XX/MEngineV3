@@ -6,9 +6,9 @@ find_package(imgui CONFIG REQUIRED)
 find_package(imguizmo CONFIG REQUIRED)
 add_executable(Editor ${RESOURCE})
 
-target_link_libraries(Editor PUBLIC Resource)
+target_link_libraries(Editor PUBLIC Function)
 target_include_directories(Editor PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
-target_link_libraries(Editor PUBLIC Resource)
+
 target_link_libraries(Editor PUBLIC glfw)
 target_include_directories(Editor PUBLIC ${BEXT_DI_INCLUDE_DIRS})
 target_link_libraries(Editor PUBLIC imgui::imgui)

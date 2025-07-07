@@ -4,18 +4,26 @@
 #include "MFolder.hpp"
 #include "MTexture.hpp"
 #include <cstdint>
+#include <entt/entity/fwd.hpp>
 #include <entt/meta/resolve.hpp>
+#include <taskflow/core/taskflow.hpp>
 #include <unordered_map>
 #include <vector>
 #define GLFW_INCLUDE_VULKAN
+#include "MRenderSystem.hpp"
 #include "Reflect.hpp"
 #include <GLFW/glfw3.h>
+#include <entt/entt.hpp>
 #include <format>
 #include <imgui.h>
 #include <memory>
 #include <string>
 #include <vulkan/vulkan.hpp>
 
+#include <ImGuizmo.h>
+
+using namespace MEngine::Core::Asset;
+using namespace MEngine::Function::System;
 namespace MEngine::Editor
 {
 struct WindowConfig
@@ -45,6 +53,7 @@ class MEngineEditor
 {
   private:
     std::shared_ptr<AssetDatabase> mAssetDatabase;
+    std::shared_ptr<MRenderSystem> mRenderSystem;
 
   public:
     MEngineEditor() = default;
@@ -67,6 +76,11 @@ class MEngineEditor
     std::unordered_map<MAssetType, VkDescriptorSet> mAssetIcons;
     std::shared_ptr<MAsset> mSelectedAsset = nullptr;
     std::shared_ptr<MAsset> mHoveredAsset = nullptr;
+    entt::entity mSelectedEntity = entt::null; // 当前选中的实体
+    entt::entity mHoveredEntity = entt::null;  // 当前悬停的实体
+    ImGuizmo::OPERATION mGuizmoOperation = ImGuizmo::TRANSLATE;
+    ImGuizmo::MODE mGuizmoMode = ImGuizmo::LOCAL;
+    entt::entity mEditorCameraEntity = entt::null; // 编辑器相机实体
     enum class InspectorTab
     {
         None = 0,
@@ -76,6 +90,7 @@ class MEngineEditor
     InspectorTab mSelectedTab = InspectorTab::COMPONENTS; // 默认 Components 选中
     int mColumns = 10;                                    // 列数
   private:
+    tf::Taskflow mTaskflow;
     GLFWwindow *mWindow = nullptr;
     bool mIsFullscreen = false;
     WindowConfig mWindowConfig;
@@ -88,6 +103,8 @@ class MEngineEditor
     void InitVulkan();
     void InitImGui();
     void InitDataBase();
+    void InitEditorCamera();
+    void InitSystem();
     void UI();
     void RenderToolbarPanel();
     void RenderViewportPanel();
@@ -97,11 +114,13 @@ class MEngineEditor
 
     uint32_t mFrameCount = 2;
     uint32_t mCurrentFrameIndex = 0;
+    std::vector<VkDescriptorSet> mViewPortDescriptorSets{};
     std::vector<vk::UniqueFramebuffer> mUIFramebuffers;
     std::vector<vk::UniqueCommandBuffer> mUICmdBuffers;
     std::vector<vk::UniqueFence> mInFlightFences;
     std::vector<vk::UniqueSemaphore> mImageAvailableSemaphores;
     std::vector<vk::UniqueSemaphore> mRenderFinishedSemaphores;
+
     void CreateCommandBuffers();
     void CreateUIRenderPass();
     void CreateFramebuffer();

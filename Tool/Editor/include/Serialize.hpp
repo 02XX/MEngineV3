@@ -1,10 +1,10 @@
 #pragma once
 #include "MAsset.hpp"
-#include "MAssetSetting.hpp"
+
 #include "MPipeline.hpp"
-#include "MPipelineSetting.hpp"
+
 #include "MTexture.hpp"
-#include "MTextureSetting.hpp"
+
 #include "UUID.hpp"
 #include <magic_enum/magic_enum.hpp>
 #include <nlohmann/json.hpp>
@@ -132,7 +132,7 @@ template <> struct adl_serializer<MPipelineSetting>
         j = static_cast<const MAssetSetting &>(setting);
         j["VertexShaderPath"] = setting.VertexShaderPath.string();
         j["FragmentShaderPath"] = setting.FragmentShaderPath.string();
-        j["RenderPassType"] = magic_enum::enum_name(setting.mRenderPassType);
+        j["RenderPassType"] = magic_enum::enum_name(setting.RenderPassType);
         // 光栅化状态
         j["DepthClampEnable"] = setting.DepthClampEnable;
         j["RasterizerDiscardEnable"] = setting.RasterizerDiscardEnable;
@@ -166,8 +166,8 @@ template <> struct adl_serializer<MPipelineSetting>
         setting.VertexShaderPath = j["VertexShaderPath"].get<std::filesystem::path>();
         setting.FragmentShaderPath = j["FragmentShaderPath"].get<std::filesystem::path>();
         auto renderPassTypeStr = j["RenderPassType"].get<std::string>();
-        setting.mRenderPassType = magic_enum::enum_cast<Manager::RenderPassType>(renderPassTypeStr)
-                                      .value_or(Manager::RenderPassType::ForwardComposition);
+        setting.RenderPassType =
+            magic_enum::enum_cast<RenderPassType>(renderPassTypeStr).value_or(RenderPassType::ForwardComposition);
         // 光栅化状态
         setting.DepthClampEnable = j["DepthClampEnable"].get<bool>();
         setting.RasterizerDiscardEnable = j["RasterizerDiscardEnable"].get<bool>();
@@ -244,13 +244,13 @@ template <> struct adl_serializer<MTexture>
     static void to_json(json &j, const MTexture &asset)
     {
         j = static_cast<const MAsset &>(asset);
-        j["imagePath"] = asset.mImagePath;
+        j["data"] = asset.mImageData;
         j["setting"] = asset.mSetting;
     }
     static void from_json(const json &j, MTexture &asset)
     {
         j.get_to<MAsset>(asset);
-        asset.mImagePath = j["imagePath"].get<std::filesystem::path>();
+        asset.mImageData = j["data"].get<std::vector<uint8_t>>();
         asset.mSetting = j["setting"].get<MTextureSetting>();
     }
 };

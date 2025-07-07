@@ -7,6 +7,10 @@ namespace MEngine
 VulkanContext::VulkanContext()
 {
 }
+VulkanContext::~VulkanContext()
+{
+    Destroy();
+}
 void VulkanContext::InitContext(const VulkanContextConfig &config)
 {
     mConfig = config;
@@ -30,12 +34,10 @@ void VulkanContext::Init()
 }
 void VulkanContext::Destroy()
 {
-    GraphicsCommandPool.reset();
-    TransferCommandPool.reset();
-    PresentCommandPool.reset();
-    Device.reset();
-    PhysicalDevice = nullptr;
-    Instance.reset();
+    if (VmaAllocator)
+    {
+        vmaDestroyAllocator(VmaAllocator);
+    }
 }
 void VulkanContext::CreateInstance()
 {

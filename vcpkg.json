@@ -1,0 +1,30 @@
+{
+  "dependencies": [
+    "assimp",
+    "bext-di",
+    "cista",
+    "concurrentqueue",
+    "entt",
+    "fmt",
+    "glfw3",
+    "glm",
+    "gtest",
+    {
+      "name": "imgui",
+      "features": [
+        "docking-experimental",
+        "freetype",
+        "glfw-binding",
+        "vulkan-binding"
+      ]
+    },
+    "imguizmo",
+    "magic-enum",
+    "nlohmann-json",
+    "shaderc",
+    "spdlog",
+    "stb",
+    "taskflow",
+    "vulkan-memory-allocator"
+  ]
+}

@@ -25,5 +25,6 @@ class IMManager : public IMManagerBase
     virtual std::shared_ptr<TAsset> Create(const TSetting &setting) = 0;
 
     virtual void Update(std::shared_ptr<TAsset> asset) = 0;
+    
 };
 } // namespace MEngine::Core::Manager

@@ -3,7 +3,7 @@
 #include "MPBRMaterial.hpp"
 namespace MEngine::Core::Manager
 {
-class IMPBRMaterialManager : public IMMaterialManager<MPBRMaterial, MPBRMaterialSetting>
+class IMPBRMaterialManager : public virtual IMMaterialManager<MPBRMaterial, MPBRMaterialSetting>
 {
   public:
     ~IMPBRMaterialManager() override = default;

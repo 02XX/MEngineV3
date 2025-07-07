@@ -16,13 +16,13 @@ class IMTextureManager : public virtual IMManager<MTexture, MTextureSetting>
 {
   public:
     ~IMTextureManager() override = default;
-    /**
-     * @brief 将图片写入到纹理
-     *
-     * @param texture 目标纹理
-     * @param path 图片路径
-     */
-    virtual void Write(std::shared_ptr<MTexture> texture, const std::filesystem::path &path) = 0;
+    // /**
+    //  * @brief 将图片写入到纹理
+    //  *
+    //  * @param texture 目标纹理
+    //  * @param path 图片路径
+    //  */
+    // virtual void Write(std::shared_ptr<MTexture> texture, const std::filesystem::path &path) = 0;
     /**
      * @brief 将数据写入到纹理
      *

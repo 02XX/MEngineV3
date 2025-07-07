@@ -198,20 +198,20 @@ void MTextureManager::Update(std::shared_ptr<MTexture> texture)
     texture->mImageView = std::move(newTexture->mImageView);
     texture->mSetting = newTexture->mSetting;
 }
-void MTextureManager::Write(std::shared_ptr<MTexture> texture, const std::filesystem::path &path)
-{
-    stbi_set_unpremultiply_on_load(true);
-    int width, height, channels;
-    unsigned char *data = stbi_load(path.string().c_str(), &width, &height, &channels, STBI_rgb_alpha);
-    if (!data)
-    {
-        LogError("Failed to load texture image");
-        return;
-    }
-    TextureSize size{static_cast<uint32_t>(width), static_cast<uint32_t>(height), static_cast<uint32_t>(channels)};
-    Write(texture, std::vector<uint8_t>(data, data + width * height * channels), size);
-    stbi_image_free(data);
-}
+// void MTextureManager::Write(std::shared_ptr<MTexture> texture, const std::filesystem::path &path)
+// {
+//     stbi_set_unpremultiply_on_load(true);
+//     int width, height, channels;
+//     unsigned char *data = stbi_load(path.string().c_str(), &width, &height, &channels, STBI_rgb_alpha);
+//     if (!data)
+//     {
+//         LogError("Failed to load texture image");
+//         return;
+//     }
+//     TextureSize size{static_cast<uint32_t>(width), static_cast<uint32_t>(height), static_cast<uint32_t>(channels)};
+//     Write(texture, std::vector<uint8_t>(data, data + width * height * channels), size);
+//     stbi_image_free(data);
+// }
 void MTextureManager::Write(std::shared_ptr<MTexture> texture, const std::vector<uint8_t> &data,
                             const TextureSize &size)
 {

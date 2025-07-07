@@ -2,10 +2,10 @@ file(GLOB_RECURSE RESOURCE  ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp)
 set_source_files_properties(${SOURCE_FILES} PROPERTIES CMAKE_CONFIGURE_DEPENDS ON)
 find_package(assimp CONFIG REQUIRED)
 
-add_library(Resource ${RESOURCE})
-target_include_directories(Resource PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
-target_link_libraries(Resource PUBLIC Core)
-target_link_libraries(Resource PRIVATE assimp::assimp)
+add_library(MResource ${RESOURCE})
+target_include_directories(MResource PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_link_libraries(MResource PUBLIC Core)
+target_link_libraries(MResource PRIVATE assimp::assimp)
 #Assets
 add_custom_target(
     Assets
@@ -15,7 +15,7 @@ add_custom_target(
     COMMENT "Copying assets files from source_folder to destination_folder..."
     VERBATIM
 )
-add_dependencies(Resource Assets)
+add_dependencies(MResource Assets)
 add_custom_target(
     ProjectD
     ALL
@@ -24,7 +24,7 @@ add_custom_target(
     COMMENT "Copying Project files from source_folder to destination_folder..."
     VERBATIM
 )
-add_dependencies(Resource ProjectD)
+add_dependencies(MResource ProjectD)
 
 #appsetting.json
 add_custom_target(
@@ -34,5 +34,5 @@ add_custom_target(
     COMMENT "Copying appsetting.json files from source_folder to destination_folder..."
     VERBATIM
 )
-add_dependencies(Resource AppSetting)
+add_dependencies(MResource AppSetting)
 

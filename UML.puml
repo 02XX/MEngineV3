@@ -1,0 +1,451 @@
+@startuml
+
+namespace MEngine.Core {
+class Asset
+{
+    +name: String
+    +isDirty: bool
+    +MarkDirty()
+}
+
+class Folder
+{
+    +path: Path
+}
+
+enum WrapMode
+{
+    Repeat
+    MirroredRepeat 
+    ClampToEdge 
+    ClampToBorder 
+}
+enum FilterMode
+{
+    Nearest
+    Linear
+    NearestMipmapNearest
+    LinearMipmapNearest
+    NearestMipmapLinear 
+    LinearMipmapLinear 
+}
+class Texture
+{
+- sampler: GLuint
+- image: GLuint
++ width : Int {readOnly}
++ height: Int {readOnly}
++ channel: Int {readOnly}
++ mipMapBias: float
++ mipmapLevel: Int {readOnly}
++ wrapModeU: WrapMode 
++ wrapModeV: WrapMode
++ wrapModeW: WrapMode
++ minFilter: FilterMode
++ magFilter: FilterMode
++ anisoLevel: Int
++ texelSize: Vector2 {readOnly}
+}
+enum EXRFlags
+{
+    '0 1 2 4 8方便位掩码
+    'No flag. This will result in an uncompressed 16-bit float EXR file.
+    None = 0
+    'The texture will be exported as a 32-bit float EXR file (default is 16-bit).
+    OutputAsFloat = 1
+    'The texture will use the EXR ZIP compression format.
+    CompressZIP = 2
+    'The texture will use RLE (Run Length Encoding) EXR compression format (similarto Targa RLE compression).
+    CompressRLE = 4
+    'This texture will use Wavelet compression. This is best used for grainy images.
+    CompressPIZ = 8
+}
+enum Format
+{
+    R8
+    R8G8
+    'for EXR
+    R16G16B16A16
+    R16G16B16
+    'TODO Compress format
+}
+class Texture2D
+{
+    +format: Format {readOnly}
+    +{static} whiteTexture:Texture2D {readOnly}
+    +{static} blackTexture:Texture2D {readOnly}
+    +{static} redTexture:Texture2D {readOnly}
+    +{static} grayTexture:Texture2D {readOnly}
+    +{static} normalTexture:Texture2D {readOnly}
+}
+class Texture2DArray
+{
+    '待实现
+}
+class Texture3D
+{
+    '待实现
+}
+
+enum PipelineType
+{
+    ForwardOpaquePBR
+    ForwardOpaquePhong
+    TransparentPhong
+    Custom
+}
+class Pipeline
+{
+    -program: GLuint
+    +blendingEnabled: bool 
+    +blendFuncSrc: GLenum  {readOnly}
+    +blendFuncDst: GLenum  {readOnly}
+    +vertexShaderPath: Path 
+    +fragmentShaderPath: Path
+    +vertexShader: GLuint {readOnly}
+    +fragmentShader: GLuint {readOnly}
+}
+class Material
+{
+    -UBO: GLuint
+    +bindingDescription: Map<GLenum, UUID>
+    +pipelineTypeID: PipelineType 
+    +pipeline: UUID 
+}
+class PBRMaterial
+{
+    +metallic: Float
+    +roughness: Float
+    +ao: Float
+    +emissive: Vector3
+    +emissiveIntensity: Float
+    +AlbedoTextureID: UUID
+    +NormalTextureID: UUID
+    +ARMTextureID: UUID
+    +emissiveTextureID: UUID
+}
+class PhongMaterial
+{
+    +diffuse: Vector3
+    +specular: Vector3
+    +shininess: Float
+    +diffuseTextureID: UUID
+    +specularTextureID: UUID
+    +normalTextureID: UUID
+    +emissiveTextureID: UUID
+}
+class CustomMaterial
+{
+    +customUniforms: Map<Int, Any>
+    +customTextures: Map<GLenum, UUID>
+}
+
+struct Vertex
+{
+    +position: Vector3
+    +normal: Vector3
+    +tangent: Vector3
+    +bitangent: Vector3
+    +uv: Vector2
+}
+class Mesh
+{
+    -VAO: GLuint
+    -VBO: GLuint
+    -EBO: GLuint
+    +vertices: List<Vertex>
+    +indices: List<UInt>
+}
+struct Node
+{
+    +name: String
+    +localMeshIndex: List<Int>
+    +children: List<Node>
+    +localTransform: Matrix4
+}
+class Model
+{
+    +modelName: String
+    +rootNode: Node
+    +meshes: List<UUID>
+    +materials: List<UUID>
+}
+class Prefab
+{
+    +prefabName: String
+    +rootNode: Node
+    +meshes: List<UUID>
+    +materials: List<UUID>
+}
+class Scene
+{
+    +sceneName: String
+    +globalGravity: Vector3
+    +camera: entity
+    +register: ECSRegister
+}
+Scene -|> Asset
+Mesh -|> Asset
+Mesh --> Vertex
+Model -|> Asset
+Model --> Node
+Model --> Mesh
+Model --> Material
+Prefab -|> Asset
+Prefab --> Node
+Prefab --> Mesh
+Prefab --> Material
+Folder -|> Asset
+Texture -|> Asset
+Texture --> WrapMode
+Texture --> FilterMode
+Texture2D -|> Texture
+Texture2D --> Format
+Texture2D --> EXRFlags
+Texture2DArray -|> Texture
+Texture3D -|> Texture
+Material -|> Asset
+PBRMaterial -|> Material
+PhongMaterial -|> Material
+CustomMaterial -|> Material
+Pipeline -|> Asset
+Pipeline --> PipelineType
+
+}
+'=======================================================
+namespace MEngine.Editor {
+enum AssetType
+{
+    Folder
+    Material
+    Texture
+    Model
+}
+class AssetMeta
+{
+    +uuid: UUID
+    +assetPath: Path
+    +assetType: AssetType
+    +assetImporter: AssetImporter
+}
+AssetMeta --> AssetImporter
+class AssetDatabase <<static>>
+{
+    -UUID2Meta: Map<UUID, AssetMeta>
+    -path2UUID: Map<Path, UUID>
+    -UUID2Asset: Map<UUID, Asset>
+    -assetFolder: List<Path>
+    +RegisterAssetFolder(path: Path): Void
+    +UnregisterAssetFolder(path: Path): Void
+    +CreateFolder(parentFolder: Path, newFolderName: String): Void
+    +MoveAsset(srcPath: Path, dstPath: Path): Void
+    +RenameAsset(path: Path, newName: String): Void
+    +DeleteAsset(path: Path): Void
+    +ImportAsset(path: Path): Void
+    +LoadAssetAtPath<T>(path: Path) : T
+    +CopyAsset(srcPath: Path, dstPath: Path): Void
+    '创建native的资源
+    +CreateAsset(asset:Asset, path: Path): Void
+}
+class AssetImporter
+{
+    +assetPath: Path
+    +assetType: AssetType
+    +import(): T
+}
+AssetDatabase --> AssetImporter
+AssetDatabase --o AssetMeta
+class TextureImporter
+{
+    +import(): Texture2D
+}
+TextureImporter -|> AssetImporter
+class ModelImporter
+{
+    +import(): Model
+}
+ModelImporter -|> AssetImporter
+class PipelineImporter
+{
+    +import(): Pipeline
+}
+PipelineImporter -|> AssetImporter
+class AudioImporter
+{
+    +import(): AudioClip
+}
+AudioImporter -|> AssetImporter
+class AssetManager
+{
+    -assetDatabase: AssetDatabase
+    'loop for all assets in another thread
+    +UpdateDirtyAssets(): Void
+}
+AssetManager --* AssetDatabase
+AssetMeta --> AssetType
+}
+'==============================Component=========================
+namespace MEngine.Function {
+struct Component
+{
+    +componentName: String
+    +enable: bool
+}
+struct TransformComponent
+{
+    +localPosition: Vector3
+    +localRotation: Quaternion
+    +localScale: Vector3
+    +worldPosition: Vector3
+    +worldRotation: Quaternion
+    +worldScale: Vector3
+    +localTransform: Matrix4
+    +worldTransform: Matrix4
+    +parent: TransformComponent
+    +children: List<TransformComponent>
+}
+TransformComponent -|> Component
+struct MeshRendererComponent
+{
+    +materialID: UUID
+    +meshID: UUID
+}
+MeshRendererComponent -|> Component
+enum ProjectionMode
+{
+    Perspective
+    Orthographic
+}
+enum ControlMode
+{
+    Free
+    LookAt
+}
+struct CameraComponent
+{
+    +fov: Float
+    +aspect: Float
+    +near: Float
+    +far: Float
+    'only for lookAt camera
+    +target: Vector3
+    +projectionMode: ProjectionMode
+    +controlMode: ControlMode
+    +projectionMatrix: Matrix4
+    +viewMatrix: Matrix4
+    +viewProjectionMatrix: Matrix4
+}
+CameraComponent -|> Component
+CameraComponent --> ProjectionMode
+CameraComponent --> ControlMode
+enum LightType
+{
+    Directional
+    Point
+    Spot
+}
+struct LightComponent
+{
+    +lightType: LightType
+    +color: Vector3
+    +intensity: Float
+    'only for point light
+    +range: Float
+    +attenuation: Float
+    'only for spot light
+    +spotAngle: Float
+    +spotBlur : Float
+
+    +castShadow: bool
+    +shadowBias: Float
+}
+LightComponent -|> Component
+LightComponent --> LightType
+enum ColliderType
+{
+    Box
+    Sphere
+    Capsule
+    Mesh
+}
+struct ColliderShape 
+{
+    +radius: Float
+    +size: Vector3
+    +height: Float
+}
+struct ColliderComponent
+{
+    +colliderType: ColliderType
+    +isTrigger: bool
+    +isStatic: bool
+    +isKinematic: bool
+    +offset: Vector3
+    +shape: ColliderShape
+}
+ColliderComponent -|> Component
+ColliderComponent --> ColliderType
+ColliderComponent --> ColliderShape
+enum Constraints 
+{
+    None = 0
+    FreezePositionX = 1 << 0
+    FreezePositionY = 1 << 1
+    FreezePositionZ = 1 << 2
+    FreezeRotationX = 1 << 3
+    FreezeRotationY = 1 << 4
+    FreezeRotationZ = 1 << 5
+}
+enum CollisionDetectionMode 
+{
+    Discrete,
+    Continuous,
+    ContinuousDynamic
+}
+struct RigidBodyComponent
+{
+    +mass: Float
+    +velocity: Vector3
+    +angularVelocity: Vector3
+    +useGravity: bool
+    +constraints: Constraints
+    +collisionDetectionMode: CollisionDetectionMode
+    +linearDamping: Float
+    +angularDamping: Float
+    +centerOfMass: Vector3
+}
+RigidBodyComponent -|> Component
+RigidBodyComponent --> Constraints
+RigidBodyComponent --> CollisionDetectionMode
+struct ScriptComponent
+{
+    'TODO
+}
+ScriptComponent -|> Component
+struct PlayerComponent 
+{
+    'TODO
+}
+PlayerComponent -|> Component
+struct AIComponent
+{
+    'TODO
+}
+AIComponent -|> Component
+struct AudioComponent
+{
+    'TODO
+}
+AudioComponent -|> Component
+struct AnimatorComponent
+{
+    'TODO
+}
+AnimatorComponent -|> Component
+struct NetworkComponent 
+{
+    'TODO
+}
+NetworkComponent -|> Component
+}
+@enduml

@@ -2,9 +2,11 @@
 #include "MAsset.hpp"
 #include "MManager_fwd.hpp"
 #include "VulkanContext.hpp"
+#include <cstdint>
 #include <filesystem>
 #include <memory>
 #include <nlohmann/json_fwd.hpp>
+#include <vector>
 #include <vulkan/vulkan.hpp>
 
 namespace MEngine::Core::Asset
@@ -51,7 +53,7 @@ class MTexture final : public MAsset
 
   private:
     std::shared_ptr<VulkanContext> mVulkanContext{};
-    std::filesystem::path mImagePath{};
+    std::vector<uint8_t> mImageData{};
     MTextureSetting mSetting{};
 
     // GPU resources
@@ -67,7 +69,6 @@ class MTexture final : public MAsset
     {
         mType = MAssetType::Texture;
         mState = MAssetState::Unloaded;
-        mImagePath = "default_texture.png";
     }
     ~MTexture() override
     {
@@ -96,14 +97,6 @@ class MTexture final : public MAsset
     inline void SetSetting(const MTextureSetting &setting)
     {
         mSetting = setting;
-    }
-    inline const std::filesystem::path &GetImagePath() const
-    {
-        return mImagePath;
-    }
-    inline void SetImagePath(const std::filesystem::path &path)
-    {
-        mImagePath = path;
     }
 };
 

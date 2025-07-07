@@ -1,4 +1,7 @@
 #include "MModelManager.hpp"
+#include "MMesh.hpp"
+#include "MModel.hpp"
+#include <memory>
 
 namespace MEngine::Core::Manager
 {
@@ -64,16 +67,23 @@ std::shared_ptr<MModel> MModelManager::CreateCube()
                                            16, 17, 18, 16, 18, 19,
                                            // 底面
                                            20, 21, 22, 20, 22, 23};
-    auto mesh = mMeshManager->Create({});
+    auto meshSetting = MMeshSetting{};
+    meshSetting.vertexBufferSize = vertices.size() * sizeof(Vertex);
+    meshSetting.indexBufferSize = indices.size() * sizeof(uint32_t);
+    auto mesh = mMeshManager->Create(meshSetting);
+    mesh->SetVertices(vertices);
+    mesh->SetIndices(indices);
     mMeshManager->Write(mesh, vertices, indices);
     auto pbrMaterial = mMaterialManager->Create({});
     auto model = std::make_shared<MModel>(MModel(mUUIDGenerator->Create(), {}));
     model->mMeshes.emplace_back(mesh);
     model->mMaterials.emplace_back(pbrMaterial);
-    Node rootNode;
-    rootNode.Children = {0}; // 只有一个子节点，即第一个网格
-    rootNode.MeshIndex = 0;  // 第一个网格的索引
-    model->mRootNode = rootNode;
+    std::unique_ptr<Node> rootNode = std::make_unique<Node>();
+    rootNode->MeshIndex = 0;               // 第一个网格的索引
+    rootNode->Name = "Cube";               // 根节点名称
+    rootNode->MaterialIndex = 0;           // 第一个材质的索引
+    rootNode->Transform = glm::mat4(1.0f); // 单位
+    model->mRootNode = std::move(rootNode);
     return model;
 }
 } // namespace MEngine::Core::Manager

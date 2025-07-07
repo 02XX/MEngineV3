@@ -1,7 +1,6 @@
 #pragma once
 #include "Logger.hpp"
 #include "MAsset.hpp"
-#include "MAssetSetting.hpp"
 #include "MFolder.hpp"
 #include "ResourceManager.hpp"
 #include "Serialize.hpp"

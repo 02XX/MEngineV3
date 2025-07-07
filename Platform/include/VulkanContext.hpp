@@ -146,7 +146,7 @@ class VulkanContext
 
   public:
     VulkanContext();
-
+    ~VulkanContext();
     void InitContext(const VulkanContextConfig &config);
     void Init();
 

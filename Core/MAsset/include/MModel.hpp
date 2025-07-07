@@ -16,8 +16,12 @@ class MModelSetting : public MAssetSetting
 };
 struct Node
 {
-    std::vector<uint32_t> Children{}; // Indices of child nodes
-    uint32_t MeshIndex = -1;          // Index of the mesh in the model
+    std::string Name{};             // Name of the node
+    glm::mat4 Transform{1.0f};      // Transformation matrix of the node
+    uint32_t MeshIndex = -1;        // Index of the mesh in the model
+    uint32_t MaterialIndex = -1;    // Index of the material in the model
+    Node *Parent = nullptr;         // Pointer to the parent node, nullptr if root
+    std::vector<Node *> Children{}; // Indices of child nodes
 };
 class MModel : public MAsset
 {
@@ -27,7 +31,7 @@ class MModel : public MAsset
   private:
     std::vector<std::shared_ptr<MMesh>> mMeshes{};
     std::vector<std::shared_ptr<MMaterial>> mMaterials{};
-    Node mRootNode{};
+    std::unique_ptr<Node> mRootNode{};
     MModelSetting mSetting{};
 
   public:
@@ -36,13 +40,25 @@ class MModel : public MAsset
         mType = MAssetType::Model;
         mState = MAssetState::Unloaded;
     }
-    inline const Node &GetRootNode() const
+    inline const Node *GetRootNode() const
     {
-        return mRootNode;
+        return mRootNode.get();
     }
-    inline void SetRootNode(const Node &rootNode)
+    inline const std::vector<std::shared_ptr<MMesh>> &GetMeshes() const
     {
-        mRootNode = rootNode;
+        return mMeshes;
+    }
+    inline void SetMeshes(const std::vector<std::shared_ptr<MMesh>> &meshes)
+    {
+        mMeshes = meshes;
+    }
+    inline const std::vector<std::shared_ptr<MMaterial>> &GetMaterials() const
+    {
+        return mMaterials;
+    }
+    inline void SetMaterials(const std::vector<std::shared_ptr<MMaterial>> &materials)
+    {
+        mMaterials = materials;
     }
 };
 } // namespace MEngine::Core::Asset

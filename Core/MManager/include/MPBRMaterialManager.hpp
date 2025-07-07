@@ -3,7 +3,8 @@
 #include "MMaterialManager.hpp"
 namespace MEngine::Core::Manager
 {
-class MPBRMaterialManager final : public MMaterialManager<MPBRMaterial, MPBRMaterialSetting>, IMPBRMaterialManager
+class MPBRMaterialManager final : public MMaterialManager<MPBRMaterial, MPBRMaterialSetting>,
+                                  public IMPBRMaterialManager
 {
   public:
     MPBRMaterialManager(std::shared_ptr<VulkanContext> vulkanContext, std::shared_ptr<IUUIDGenerator> uuidGenerator)
@@ -15,5 +16,6 @@ class MPBRMaterialManager final : public MMaterialManager<MPBRMaterial, MPBRMate
     void Update(std::shared_ptr<MPBRMaterial> material) override
     {
     }
+    
 };
 } // namespace MEngine::Core::Manager

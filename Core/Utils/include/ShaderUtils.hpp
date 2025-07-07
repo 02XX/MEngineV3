@@ -1,3 +1,4 @@
+#pragma once
 #include <shaderc/shaderc.h>
 #include <shaderc/shaderc.hpp>
 

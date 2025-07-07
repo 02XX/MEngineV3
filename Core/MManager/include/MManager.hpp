@@ -1,9 +1,11 @@
 #pragma once
 #include "IMManager.hpp"
 #include "IUUIDGenerator.hpp"
+#include "UUID.hpp"
 #include "VulkanContext.hpp"
 #include <concepts>
 #include <memory>
+#include <unordered_map>
 
 using namespace MEngine::Core::Asset;
 namespace MEngine::Core::Manager

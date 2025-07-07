@@ -20,7 +20,7 @@ class MTextureManager final : public MManager<MTexture, MTextureSetting>, public
     ~MTextureManager() override = default;
     std::shared_ptr<MTexture> Create(const MTextureSetting &setting) override;
     void Update(std::shared_ptr<MTexture> texture) override;
-    void Write(std::shared_ptr<MTexture> texture, const std::filesystem::path &path) override;
+    // void Write(std::shared_ptr<MTexture> texture, const std::filesystem::path &path) override;
     void Write(std::shared_ptr<MTexture> texture, const std::vector<uint8_t> &data, const TextureSize &size) override;
     static vk::ImageType TextureTypeToImageType(vk::ImageViewType type);
     static vk::ImageUsageFlags PickImageUsage(const MTextureSetting &setting);
