@@ -48,6 +48,7 @@ class MPBRMaterial final : public MMaterial
                  const MPBRMaterialSetting &setting)
         : MMaterial(id, name, setting), mProperties(), mTextures(), mVulkanContext(vulkanContext)
     {
+        mMaterialType = MMaterialType::PBR;
     }
     ~MPBRMaterial() override
     {
@@ -56,21 +57,21 @@ class MPBRMaterial final : public MMaterial
             vmaDestroyBuffer(mVulkanContext->GetVmaAllocator(), mParamsUBO, mParamsUBOAllocation);
         }
     }
-    inline MPBRMaterialProperties &GetProperties()
+    inline MPBRMaterialProperties GetProperties() const
     {
         return mProperties;
-    }
-    inline const MPBRMaterialProperties &GetProperties() const
-    {
-        return mProperties;
-    }
-    inline MPBRTextures &GetTextures()
-    {
-        return mTextures;
     }
     inline const MPBRTextures &GetTextures() const
     {
         return mTextures;
+    }
+    inline void SetProperties(const MPBRMaterialProperties &properties)
+    {
+        mProperties = properties;
+    }
+    inline void SetTextures(const MPBRTextures &textures)
+    {
+        mTextures = textures;
     }
     inline std::span<const vk::DescriptorSetLayoutBinding> GetDescriptorSetLayoutBindings() const override
     {

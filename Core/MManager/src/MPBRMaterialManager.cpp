@@ -49,7 +49,7 @@ std::shared_ptr<MPBRMaterial> MPBRMaterialManager::Create(const MPBRMaterialSett
 void MPBRMaterialManager::Write(std::shared_ptr<MPBRMaterial> material)
 {
     // 写入材质参数
-    memcpy(material->mParamsUBOAllocationInfo.pMappedData, &material->GetProperties(), sizeof(MPBRMaterialProperties));
+    memcpy(material->mParamsUBOAllocationInfo.pMappedData, &material->mProperties, sizeof(MPBRMaterialProperties));
 
     // 更新描述集
     std::vector<vk::WriteDescriptorSet> writeDescriptorSets;

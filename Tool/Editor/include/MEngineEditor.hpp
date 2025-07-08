@@ -131,7 +131,7 @@ class MEngineEditor
     void CreateFramebuffer();
     void CreateFences();
     void CreateSemaphores();
-    void ReflectObject(entt::meta_any &instance, entt::meta_type type);
+    bool ReflectObject(entt::meta_any &instance, entt::meta_type type);
 
   private:
     // UI控件

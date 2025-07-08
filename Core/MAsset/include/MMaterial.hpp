@@ -7,7 +7,13 @@
 
 namespace MEngine::Core::Asset
 {
-
+enum class MMaterialType
+{
+    Unknown, // Unknown Material Type
+    PBR,     // Physically Based Rendering
+    Unlit,   // Unlit Material
+    Custom   // Custom Material
+};
 class MMaterialSetting : public MAssetSetting
 {
   public:
@@ -18,6 +24,7 @@ class MMaterial : public MAsset
     std::shared_ptr<MPipeline> mPipeline;
     MMaterialSetting mSetting{};
     vk::UniqueDescriptorSet mMaterialDescriptorSet;
+    MMaterialType mMaterialType = MMaterialType::Unknown;
 
   public:
     MMaterial(const UUID &id, const std::string &name, const MMaterialSetting &setting)
@@ -37,6 +44,14 @@ class MMaterial : public MAsset
     inline const vk::DescriptorSet GetMaterialDescriptorSet() const
     {
         return mMaterialDescriptorSet.get();
+    }
+    inline MMaterialType GetMaterialType() const
+    {
+        return mMaterialType;
+    }
+    inline void SetMaterialType(MMaterialType type)
+    {
+        mMaterialType = type;
     }
     virtual std::span<const vk::DescriptorSetLayoutBinding> GetDescriptorSetLayoutBindings() const = 0;
 };

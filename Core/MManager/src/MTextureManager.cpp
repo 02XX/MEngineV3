@@ -3,7 +3,9 @@
 #include "Logger.hpp"
 #include "MTexture.hpp"
 #include "VulkanContext.hpp"
+#include <imgui_impl_vulkan.h>
 #include <memory>
+#include <vulkan/vulkan_enums.hpp>
 
 namespace MEngine::Core::Manager
 {
@@ -134,7 +136,10 @@ std::shared_ptr<MTexture> MTextureManager::Create(const MTextureSetting &setting
         .setSharingMode(vk::SharingMode::eExclusive)
         .setSamples(texture->mSetting.sampleCount)
         .setFlags(PickImageFlags(texture->mSetting));
-
+    if (PickImageUsage(texture->mSetting) & vk::ImageUsageFlagBits::eDepthStencilAttachment)
+    {
+        texture->mSetting.isDepthStencil = true;
+    }
     VmaAllocationCreateInfo allocationCreateInfo = {};
     allocationCreateInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
 
@@ -181,6 +186,13 @@ std::shared_ptr<MTexture> MTextureManager::Create(const MTextureSetting &setting
     if (!texture->mImageView)
     {
         LogError("Failed to create texture image view");
+    }
+    // 创建缩略图描述集
+    if (!texture->mSetting.isDepthStencil)
+    {
+        texture->mThumbnailDescriptorSet =
+            ImGui_ImplVulkan_AddTexture(texture->mSampler.get(), texture->mImageView.get(),
+                                        static_cast<VkImageLayout>(vk::ImageLayout::eShaderReadOnlyOptimal));
     }
     mAssets[texture->GetID()] = texture;
     return texture;
@@ -298,6 +310,7 @@ void MTextureManager::CreateDefault()
     defaultTextureSetting.width = 1;
     defaultTextureSetting.height = 1;
     defaultTextureSetting.format = vk::Format::eR8G8B8A8Unorm;
+    defaultTextureSetting.isShaderResource = true;
     auto defaultTexture = Create(defaultTextureSetting, "Default Texture");
     Remove(defaultTexture->GetID());
     defaultTexture->SetID(UUID{});

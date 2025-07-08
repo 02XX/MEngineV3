@@ -4,10 +4,13 @@
 #include "VulkanContext.hpp"
 #include <cstdint>
 #include <filesystem>
+#include <imgui.h>
+#include <imgui_impl_vulkan.h>
 #include <memory>
 #include <nlohmann/json_fwd.hpp>
 #include <vector>
 #include <vulkan/vulkan.hpp>
+#include <vulkan/vulkan_handles.hpp>
 
 namespace MEngine::Core::Asset
 {
@@ -21,8 +24,9 @@ class MTextureSetting final : public MAssetSetting
     uint32_t arrayLayers = 1;
     vk::Format format = vk::Format::eR8G8B8A8Srgb;
     vk::SampleCountFlagBits sampleCount = vk::SampleCountFlagBits::e1;
-    bool isShaderResource = true;
+    bool isShaderResource = false;
     bool isRenderTarget = false;
+    bool isDepthStencil = false;
     bool isUAV = false;
     bool isShadingRateSurface = false;
     bool isTypeless = false;
@@ -62,6 +66,7 @@ class MTexture final : public MAsset
     vk::UniqueSampler mSampler{};
     VmaAllocation mAllocation{};
     VmaAllocationInfo mAllocationInfo{};
+    vk::DescriptorSet mThumbnailDescriptorSet{};
 
   public:
     MTexture(const UUID &id, const std::string &name, std::shared_ptr<VulkanContext> vulkanContext,
@@ -77,6 +82,10 @@ class MTexture final : public MAsset
         {
             VkImage image = mImage;
             vmaDestroyImage(mVulkanContext->GetVmaAllocator(), image, mAllocation);
+        }
+        if (mImageView)
+        {
+            ImGui_ImplVulkan_RemoveTexture(mThumbnailDescriptorSet);
         }
     }
     inline const vk::Image &GetImage() const
@@ -98,6 +107,10 @@ class MTexture final : public MAsset
     inline void SetSetting(const MTextureSetting &setting)
     {
         mSetting = setting;
+    }
+    inline ImTextureID GetImGuiTextureID() const
+    {
+        return reinterpret_cast<ImTextureID>(static_cast<VkDescriptorSet>(mThumbnailDescriptorSet));
     }
 };
 

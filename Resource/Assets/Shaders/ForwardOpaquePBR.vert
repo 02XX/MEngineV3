@@ -19,6 +19,8 @@ layout(push_constant) uniform PushConstant
 void main()
 {
     gl_Position = cameraParams.projectionMatrix * cameraParams.viewMatrix * pushConstants.modelMatrix * vec4(inPosition, 1.0);
+    fragTexCoords = inTexCoords;
+    fragNormal = normalize(mat3(pushConstants.modelMatrix) * inNormal); 
 }
 
 

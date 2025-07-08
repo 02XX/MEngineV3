@@ -11,9 +11,11 @@
 #include "MFolderManager.hpp"
 #include "MLightComponent.hpp"
 #include "MMaterialComponent.hpp"
+#include "MMesh.hpp"
 #include "MMeshComponent.hpp"
 #include "MMeshManager.hpp"
 #include "MModelManager.hpp"
+#include "MPBRMaterial.hpp"
 #include "MPBRMaterialManager.hpp"
 #include "MPipeline.hpp"
 #include "MPipelineManager.hpp"
@@ -44,7 +46,6 @@
 #include <imgui_impl_vulkan.h>
 #include <imgui_internal.h>
 #include <memory>
-#include <vulkan/vulkan_enums.hpp>
 
 namespace MEngine::Editor
 {
@@ -1019,12 +1020,13 @@ void MEngineEditor::RenderAssetPanel()
     }
     ImGui::End();
 }
-void MEngineEditor::ReflectObject(entt::meta_any &instance, entt::meta_type type)
+bool MEngineEditor::ReflectObject(entt::meta_any &instance, entt::meta_type type)
 {
     auto *info = static_cast<Info *>(type.custom());
     if (info == nullptr || !info->Serializable)
-        return;
+        return false;
     auto instanceName = info->DisplayName;
+    bool isModified = false;
     if (ImGui::CollapsingHeader(instanceName.data(), ImGuiTreeNodeFlags_DefaultOpen))
     {
         for (auto &&[id, field] : type.data())
@@ -1034,102 +1036,179 @@ void MEngineEditor::ReflectObject(entt::meta_any &instance, entt::meta_type type
                 continue;
             auto fieldName = fieldInfo->DisplayName.c_str();
             auto fieldType = field.type();
-
             auto fieldValue = field.get(instance);
             // UI
             if (!fieldInfo->Editable)
                 ImGui::BeginDisabled();
-            if (fieldType == entt::resolve<bool>())
+            if (!fieldType.is_pointer_like())
             {
-                auto value = fieldValue.cast<bool>();
-                if (ImGui::Checkbox(fieldName, &value))
+                if (fieldType == entt::resolve<bool>())
                 {
-                    field.set(instance, value);
+                    auto value = fieldValue.cast<bool>();
+                    if (ImGui::Checkbox(fieldName, &value))
+                    {
+                        field.set(instance, value);
+                        isModified = true;
+                    }
+                }
+                else if (fieldType == entt::resolve<int>())
+                {
+                    auto value = fieldValue.cast<int>();
+                    if (ImGui::InputInt(fieldName, &value))
+                    {
+                        field.set(instance, value);
+                        isModified = true;
+                    }
+                }
+                else if (fieldType == entt::resolve<float>())
+                {
+                    auto value = fieldValue.cast<float>();
+                    if (ImGui::InputFloat(fieldName, &value))
+                    {
+                        field.set(instance, value);
+                        isModified = true;
+                    }
+                }
+                else if (fieldType == entt::resolve<std::string>())
+                {
+                    auto value = fieldValue.cast<std::string>();
+                    if (ImGui::InputText(fieldName, value.data(), value.capacity() + 1))
+                    {
+                        field.set(instance, value);
+                        isModified = true;
+                    }
+                }
+                else if (fieldType == entt::resolve<std::filesystem::path>())
+                {
+                    auto path = fieldValue.cast<std::filesystem::path>();
+                    auto value = path.string();
+                    if (ImGui::InputText(fieldName, value.data(), value.capacity() + 1))
+                    {
+                        field.set(instance, std::filesystem::path(value));
+                        isModified = true;
+                    }
+                }
+                else if (fieldType == entt::resolve<UUID>())
+                {
+                    auto value = fieldValue.cast<UUID>().ToString();
+                    ImGui::Text("%s: %s", fieldName, value.c_str());
+                }
+                else if (fieldType == entt::resolve<glm::vec2>())
+                {
+                    auto value = fieldValue.cast<glm::vec2>();
+                    if (ImGui::DragFloat2(fieldName, glm::value_ptr(value), 0.01f))
+                    {
+                        field.set(instance, value);
+                        isModified = true;
+                    }
+                }
+                else if (fieldType == entt::resolve<glm::vec3>())
+                {
+                    auto value = fieldValue.cast<glm::vec3>();
+                    if (ImGui::DragFloat3(fieldName, glm::value_ptr(value), 0.01f))
+                    {
+                        field.set(instance, value);
+                        isModified = true;
+                    }
+                }
+                else if (fieldType == entt::resolve<glm::vec4>())
+                {
+                    auto value = fieldValue.cast<glm::vec4>();
+                    if (ImGui::DragFloat4(fieldName, glm::value_ptr(value), 0.01f))
+                    {
+                        field.set(instance, value);
+                        isModified = true;
+                    }
+                }
+                else if (fieldType == entt::resolve<glm::quat>())
+                {
+                    auto value = fieldValue.cast<glm::quat>();
+                    glm::vec3 euler = glm::degrees(glm::eulerAngles(value));
+                    if (ImGui::DragFloat3(fieldName, glm::value_ptr(euler), 0.01f))
+                    {
+                        value = glm::quat(glm::radians(euler));
+                        field.set(instance, value);
+                        isModified = true;
+                    }
+                }
+                else if (fieldType == entt::resolve<MPBRMaterialProperties>())
+                {
+                    auto value = fieldValue.cast<MPBRMaterialProperties>();
+                    auto metaProperties = entt::forward_as_meta(value);
+                    if (ReflectObject(metaProperties, entt::resolve<MPBRMaterialProperties>()))
+                    {
+                        field.set(instance, value);
+                        isModified = true;
+                    }
+                }
+                else if (fieldType == entt::resolve<MPBRTextures>())
+                {
+                    auto value = fieldValue.cast<MPBRTextures>();
+                    auto metaTextures = entt::forward_as_meta(value);
+                    ReflectObject(metaTextures, entt::resolve<MPBRTextures>());
+                }
+                else
+                {
+                    ImGui::Text("%s: %s", fieldName, fieldType.info().name().data());
                 }
             }
-            else if (fieldType == entt::resolve<int>())
+            else // smart pointer
             {
-                auto value = fieldValue.cast<int>();
-                if (ImGui::InputInt(fieldName, &value))
+                if (fieldType == entt::resolve<std::shared_ptr<MMesh>>())
                 {
-                    field.set(instance, value);
                 }
-            }
-            else if (fieldType == entt::resolve<float>())
-            {
-                auto value = fieldValue.cast<float>();
-                if (ImGui::InputFloat(fieldName, &value))
+                else if (fieldType == entt::resolve<std::shared_ptr<MMaterial>>())
                 {
-                    field.set(instance, value);
+                    auto value = fieldValue.cast<std::shared_ptr<MMaterial>>();
+                    // PBR Material
+                    switch (value->GetMaterialType())
+                    {
+                    case Core::Asset::MMaterialType::Unknown:
+                    case Core::Asset::MMaterialType::PBR: {
+                        auto pbrMaterial = std::static_pointer_cast<MPBRMaterial>(value);
+                        auto pbrMaterialMeta = entt::forward_as_meta(*pbrMaterial);
+                        if (ReflectObject(pbrMaterialMeta, entt::resolve<MPBRMaterial>()))
+                        {
+                            auto vulkanContext = injector.create<std::shared_ptr<VulkanContext>>();
+                            auto pbrMaterialManager = injector.create<std::shared_ptr<MPBRMaterialManager>>();
+                            vulkanContext->GetDevice().waitIdle();
+                            pbrMaterialManager->Write(pbrMaterial);
+                            isModified = true;
+                        }
+                        break;
+                    }
+                    case Core::Asset::MMaterialType::Unlit:
+                    case Core::Asset::MMaterialType::Custom:
+                        break;
+                    }
                 }
-            }
-            else if (fieldType == entt::resolve<std::string>())
-            {
-                auto value = fieldValue.cast<std::string>();
-                if (ImGui::InputText(fieldName, value.data(), value.capacity() + 1))
+                else if (fieldType == entt::resolve<std::shared_ptr<MTexture>>())
                 {
-                    field.set(instance, value);
+                    auto value = fieldValue.cast<std::shared_ptr<MTexture>>();
+                    if (value->GetSetting().isShaderResource)
+                    {
+                        ImGui::Image(value->GetImGuiTextureID(), ImVec2(100, 100));
+                        ImGui::SameLine();
+                        ImGui::Text("%s", fieldName);
+                    }
                 }
-            }
-            else if (fieldType == entt::resolve<std::filesystem::path>())
-            {
-                auto path = fieldValue.cast<std::filesystem::path>();
-                auto value = path.string();
-                if (ImGui::InputText(fieldName, value.data(), value.capacity() + 1))
+                else if (fieldType == entt::resolve<std::shared_ptr<MPipeline>>())
                 {
-                    field.set(instance, std::filesystem::path(value));
+                    auto value = fieldValue.cast<std::shared_ptr<MPipeline>>();
                 }
-            }
-            else if (fieldType == entt::resolve<UUID>())
-            {
-                auto value = fieldValue.cast<UUID>().ToString();
-                ImGui::Text("%s: %s", fieldName, value.c_str());
-            }
-            else if (fieldType == entt::resolve<glm::vec2>())
-            {
-                auto value = fieldValue.cast<glm::vec2>();
-                if (ImGui::DragFloat2(fieldName, glm::value_ptr(value), 0.01f))
+                else
                 {
-                    field.set(instance, value);
+                    ImGui::Text("%s: %s", fieldName, fieldType.info().name().data());
                 }
-            }
-            else if (fieldType == entt::resolve<glm::vec3>())
-            {
-                auto value = fieldValue.cast<glm::vec3>();
-                if (ImGui::DragFloat3(fieldName, glm::value_ptr(value), 0.01f))
-                {
-                    field.set(instance, value);
-                }
-            }
-            else if (fieldType == entt::resolve<glm::vec4>())
-            {
-                auto value = fieldValue.cast<glm::vec4>();
-                if (ImGui::DragFloat4(fieldName, glm::value_ptr(value), 0.01f))
-                {
-                    field.set(instance, value);
-                }
-            }
-            else if (fieldType == entt::resolve<glm::quat>())
-            {
-                auto value = fieldValue.cast<glm::quat>();
-                glm::vec3 euler = glm::degrees(glm::eulerAngles(value));
-                if (ImGui::DragFloat3(fieldName, glm::value_ptr(euler), 0.01f))
-                {
-                    value = glm::quat(glm::radians(euler));
-                    field.set(instance, value);
-                }
-            }
-            else
-            {
-                ImGui::Text("%s: %s", fieldName, fieldType.info().name().data());
             }
             if (!fieldInfo->Editable)
                 ImGui::EndDisabled();
         }
         for (auto &&[id, baseType] : type.base())
         {
-            ReflectObject(instance, baseType);
+            isModified |= ReflectObject(instance, baseType);
         }
     }
+    return isModified;
 }
 } // namespace MEngine::Editor

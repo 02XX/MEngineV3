@@ -3,6 +3,7 @@
 #include "MMaterial.hpp"
 #include "MMaterialComponent.hpp"
 #include "MMeshComponent.hpp"
+#include "MPBRMaterial.hpp"
 #include "MPipeline.hpp"
 #include "MTexture.hpp"
 #include "MTransformComponent.hpp"
@@ -51,6 +52,114 @@ static void RegisterAsset()
         .type("Pipeline"_hs)
         .custom<Info>(Info{
             .DisplayName = "Pipeline",
+            .Editable = true,
+            .Serializable = true,
+        });
+    entt::meta_factory<MMaterial>()
+        .base<MAsset>()
+        .type("Material"_hs)
+        .custom<Info>(Info{
+            .DisplayName = "Material",
+            .Editable = true,
+            .Serializable = true,
+        })
+        .data<&MMaterial::SetPipeline, &MMaterial::GetPipeline>("Pipeline"_hs)
+        .custom<Info>(Info{
+            .DisplayName = "Pipeline",
+            .Editable = true,
+            .Serializable = true,
+        });
+    entt::meta_factory<MPBRMaterial>()
+        .base<MMaterial>()
+        .type("PBRMaterial"_hs)
+        .custom<Info>(Info{
+            .DisplayName = "PBRMaterial",
+            .Editable = true,
+            .Serializable = true,
+        })
+        .data<&MPBRMaterial::SetProperties, &MPBRMaterial::GetProperties>("PBRProperties"_hs)
+        .custom<Info>(Info{
+            .DisplayName = "PBR Properties",
+            .Editable = true,
+            .Serializable = true,
+        })
+        .data<&MPBRMaterial::SetTextures, &MPBRMaterial::GetTextures>("PBRTextures"_hs)
+        .custom<Info>(Info{
+            .DisplayName = "PBR Textures",
+            .Editable = true,
+            .Serializable = true,
+        });
+    entt::meta_factory<MPBRMaterialProperties>()
+        .type("MPBRMaterialProperties"_hs)
+        .custom<Info>(Info{
+            .DisplayName = "PBR Material Properties",
+            .Editable = true,
+            .Serializable = true,
+        })
+        .data<&MPBRMaterialProperties::Albedo>("Albedo"_hs)
+        .custom<Info>(Info{
+            .DisplayName = "Albedo",
+            .Editable = true,
+            .Serializable = true,
+        })
+        .data<&MPBRMaterialProperties::Normal>("Normal"_hs)
+        .custom<Info>(Info{
+            .DisplayName = "Normal",
+            .Editable = true,
+            .Serializable = true,
+        })
+        .data<&MPBRMaterialProperties::Metallic>("Metallic"_hs)
+        .custom<Info>(Info{
+            .DisplayName = "Metallic",
+            .Editable = true,
+            .Serializable = true,
+        })
+        .data<&MPBRMaterialProperties::Roughness>("Roughness"_hs)
+        .custom<Info>(Info{
+            .DisplayName = "Roughness",
+            .Editable = true,
+            .Serializable = true,
+        })
+        .data<&MPBRMaterialProperties::AO>("AO"_hs)
+        .custom<Info>(Info{
+            .DisplayName = "Ambient Occlusion",
+            .Editable = true,
+            .Serializable = true,
+        })
+        .data<&MPBRMaterialProperties::EmissiveIntensity>("EmissiveIntensity"_hs)
+        .custom<Info>(Info{
+            .DisplayName = "Emissive Intensity",
+            .Editable = true,
+            .Serializable = true,
+        });
+    entt::meta_factory<MPBRTextures>()
+        .type("MPBRTextures"_hs)
+        .custom<Info>(Info{
+            .DisplayName = "PBR Textures",
+            .Editable = true,
+            .Serializable = true,
+        })
+        .data<&MPBRTextures::Albedo>("Albedo"_hs)
+        .custom<Info>(Info{
+            .DisplayName = "Albedo Texture",
+            .Editable = true,
+            .Serializable = true,
+        })
+        .data<&MPBRTextures::Normal>("Normal"_hs)
+        .custom<Info>(Info{
+            .DisplayName = "Normal Texture",
+            .Editable = true,
+            .Serializable = true,
+        })
+        .data<&MPBRTextures::ARM>("ARM"_hs)
+        .custom<Info>(Info{
+            .DisplayName = "ARM Texture",
+            .Editable = true,
+            .Serializable = true,
+        })
+        .data<&MPBRTextures::Emissive>("Emissive"_hs)
+        .custom<Info>(Info{
+            .DisplayName = "Emissive Texture",
             .Editable = true,
             .Serializable = true,
         });
@@ -122,26 +231,31 @@ static void RegisterComponent()
         .custom<Info>(Info{
             .DisplayName = "isMainCamera",
             .Editable = true,
+            .Serializable = true,
         })
         .data<&MCameraComponent::aspectRatio>("aspectRatio"_hs)
         .custom<Info>(Info{
             .DisplayName = "aspectRatio",
             .Editable = true,
+            .Serializable = true,
         })
         .data<&MCameraComponent::fovX>("fovX"_hs)
         .custom<Info>(Info{
             .DisplayName = "fov",
             .Editable = true,
+            .Serializable = true,
         })
         .data<&MCameraComponent::fovY>("fovY"_hs)
         .custom<Info>(Info{
             .DisplayName = "fovY",
             .Editable = true,
+            .Serializable = true,
         })
         .data<&MCameraComponent::zoom>("zoom"_hs)
         .custom<Info>(Info{
             .DisplayName = "zoom",
             .Editable = true,
+            .Serializable = true,
         });
     entt::meta_factory<MMeshComponent>()
         .type("MMeshComponent"_hs)
@@ -153,6 +267,13 @@ static void RegisterComponent()
         .custom<Info>(Info{
             .DisplayName = "Mesh ID",
             .Editable = true,
+            .Serializable = true,
+        })
+        .data<&MMeshComponent::mesh>("mesh"_hs)
+        .custom<Info>(Info{
+            .DisplayName = "Mesh",
+            .Editable = true,
+            .Serializable = true,
         });
     entt::meta_factory<MMaterialComponent>()
         .type("MMaterialComponent"_hs)
@@ -164,6 +285,13 @@ static void RegisterComponent()
         .custom<Info>(Info{
             .DisplayName = "Material ID",
             .Editable = true,
+            .Serializable = true,
+        })
+        .data<&MMaterialComponent::material>("material"_hs)
+        .custom<Info>(Info{
+            .DisplayName = "Material",
+            .Editable = true,
+            .Serializable = true,
         });
 }
 static void RegisterMeta()

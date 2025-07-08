@@ -122,12 +122,14 @@ void MRenderSystem::CreateRenderTarget()
         colorTextureSetting.format = vk::Format::eR32G32B32A32Sfloat;
         colorTextureSetting.width = mRenderTargets[i].width;
         colorTextureSetting.height = mRenderTargets[i].height;
+        colorTextureSetting.isShaderResource = true;
         mRenderTargets[i].colorTexture = mResourceManager->CreateAsset<MTexture, MTextureSetting>(colorTextureSetting);
         auto depthStencilTextureSetting = MTextureSetting{};
         depthStencilTextureSetting.isRenderTarget = true;
         depthStencilTextureSetting.format = vk::Format::eD32SfloatS8Uint;
         depthStencilTextureSetting.width = mRenderTargets[i].width;
         depthStencilTextureSetting.height = mRenderTargets[i].height;
+        depthStencilTextureSetting.isDepthStencil = true;
         mRenderTargets[i].depthStencilTexture =
             mResourceManager->CreateAsset<MTexture, MTextureSetting>(depthStencilTextureSetting);
     }
