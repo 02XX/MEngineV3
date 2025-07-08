@@ -151,6 +151,18 @@ void MRenderSystem::CreateFramebuffer()
             mVulkanContext->GetDevice().createFramebufferUnique(framebufferCreateInfo);
     }
 }
+void MRenderSystem::ReSizeFrameBuffer(uint32_t width, uint32_t height)
+{
+    mVulkanContext->GetDevice().waitIdle();
+    for (auto &renderTarget : mRenderTargets)
+    {
+        renderTarget.height = height;
+        renderTarget.width = width;
+    }
+    CreateRenderTarget();
+    CreateFramebuffer();
+    LogInfo("Frame buffer resized to {}x{}", width, height);
+}
 void MRenderSystem::Batch()
 {
     mRenderQueue.clear();

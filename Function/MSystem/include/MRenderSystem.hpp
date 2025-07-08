@@ -95,6 +95,7 @@ class MRenderSystem final : public MSystem
     void Init() override;
     void Update(float deltaTime) override;
     void Shutdown() override;
+    void ReSizeFrameBuffer(uint32_t width, uint32_t height);
     inline void SetFrameCount(uint32_t count)
     {
         mFrameCount = count;

@@ -70,6 +70,9 @@ class MEngineEditor
 
   private:
     std::filesystem::path mProjectPath = "Project";
+    std::vector<Resolution> mResolutions = {{100, 100},   {800, 600},   {1280, 720}, {1920, 1080},
+                                            {2560, 1440}, {3840, 2160}, {5120, 2880}};
+    Resolution mCurrentResolution = {1280, 720};
 
     // UI
     std::unordered_map<MAssetType, std::shared_ptr<MTexture>> mAssetIconTextures;
@@ -105,6 +108,8 @@ class MEngineEditor
     void InitDataBase();
     void InitEditorCamera();
     void InitSystem();
+    void SetViewPort();
+    void HandleSwapchainOutOfDate();
     void UI();
     void RenderToolbarPanel();
     void RenderViewportPanel();

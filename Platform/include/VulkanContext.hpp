@@ -134,6 +134,7 @@ class VulkanContext
     {
         return DescriptorPool.get();
     }
+    void RecreateSwapchain();
 
   private:
     void CreateInstance();
@@ -145,7 +146,6 @@ class VulkanContext
     void CreateVMA();
     void QuerySurfaceInfo();
     void CreateSwapchain(vk::SwapchainKHR oldSwapchain = nullptr);
-    void RecreateSwapchain();
     void CreateSwapchainImages();
     void CreateSwapchainImageViews();
     void CreateDescriptorPool();

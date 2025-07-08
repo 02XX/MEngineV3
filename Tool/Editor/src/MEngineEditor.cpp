@@ -247,6 +247,15 @@ void MEngineEditor::InitSystem()
     mRenderSystem->SetFrameCount(mFrameCount);
     mRenderSystem->SetExtent(800, 600);
     mRenderSystem->Init();
+    SetViewPort();
+}
+void MEngineEditor::SetViewPort()
+{
+    for (auto &viewPortDescriptorSet : mViewPortDescriptorSets)
+    {
+        ImGui_ImplVulkan_RemoveTexture(viewPortDescriptorSet);
+    }
+    mViewPortDescriptorSets.clear();
     mViewPortDescriptorSets.resize(mFrameCount);
     for (uint32_t i = 0; i < mFrameCount; ++i)
     {
@@ -254,6 +263,19 @@ void MEngineEditor::InitSystem()
         mViewPortDescriptorSets[i] = ImGui_ImplVulkan_AddTexture(
             renderTarget.colorTexture->GetSampler(), renderTarget.colorTexture->GetImageView(),
             static_cast<VkImageLayout>(vk::ImageLayout::eShaderReadOnlyOptimal));
+    }
+
+    auto registry = injector.create<std::shared_ptr<entt::registry>>();
+    auto view = registry->view<MCameraComponent>();
+    for (auto entity : view)
+    {
+        auto &cameraComponent = registry->get<MCameraComponent>(entity);
+        if (cameraComponent.isMainCamera)
+        {
+            cameraComponent.aspectRatio = static_cast<float>(mCurrentResolution.width) / mCurrentResolution.height;
+            cameraComponent.dirty = true;
+            break;
+        }
     }
 }
 void MEngineEditor::Run(float deltaTime)
@@ -291,7 +313,8 @@ void MEngineEditor::Run(float deltaTime)
             vulkanContext->GetSwapchain(), 1000000000, mImageAvailableSemaphores[mCurrentFrameIndex].get(), nullptr);
         if (resultValue.result == vk::Result::eErrorOutOfDateKHR)
         {
-            // HandleSwapchainOutOfDate();
+            HandleSwapchainOutOfDate();
+            continue;
         }
 
         ImGui_ImplVulkan_NewFrame();
@@ -364,19 +387,33 @@ void MEngineEditor::Run(float deltaTime)
         presentInfo.setSwapchains(vulkanContext->GetSwapchain())
             .setImageIndices({resultValue.value})
             .setWaitSemaphores(presentWaitSemaphores);
-        auto presentResult = vulkanContext->GetPresentQueue().presentKHR(presentInfo);
-        if (presentResult == vk::Result::eErrorOutOfDateKHR || presentResult == vk::Result::eSuboptimalKHR)
+        try
         {
-            // HandleSwapchainOutOfDate();
+            auto presentResult = vulkanContext->GetPresentQueue().presentKHR(presentInfo);
+            if (presentResult != vk::Result::eSuccess && presentResult != vk::Result::eSuboptimalKHR)
+            {
+                LogError("Failed to present image: {}", vk::to_string(presentResult));
+                throw std::runtime_error("Failed to present image");
+            }
         }
-        else if (presentResult != vk::Result::eSuccess)
+        catch (vk::OutOfDateKHRError &)
         {
-            LogError("Failed to present swapchain image: {}", vk::to_string(presentResult));
+            HandleSwapchainOutOfDate();
         }
         mCurrentFrameIndex = (mCurrentFrameIndex + 1) % mFrameCount;
     }
     // executor.wait_for_all();
     LogDebug("MEngine Editor run loop exited");
+}
+void MEngineEditor::HandleSwapchainOutOfDate()
+{
+    auto vulkanContext = injector.create<std::shared_ptr<VulkanContext>>();
+    vulkanContext->GetDevice().waitIdle();
+    vulkanContext->RecreateSwapchain();
+    auto &surfaceInfo = vulkanContext->GetSurfaceInfo();
+    mWindowConfig.width = surfaceInfo.extent.width;
+    mWindowConfig.height = surfaceInfo.extent.height;
+    CreateFramebuffer();
 }
 void MEngineEditor::Shutdown()
 {
@@ -418,6 +455,7 @@ void MEngineEditor::Shutdown()
 }
 void MEngineEditor::CreateFramebuffer()
 {
+    mUIFramebuffers.clear();
     auto vulkanContext = injector.create<std::shared_ptr<VulkanContext>>();
     const auto &swapchainImageViews = vulkanContext->GetSwapchainImageViews();
     for (const auto &imageView : swapchainImageViews)
@@ -557,19 +595,15 @@ void MEngineEditor::UI()
     }
     RenderInspectorPanel();
     RenderAssetPanel();
-    RenderViewportPanel();
     RenderToolbarPanel();
+    RenderViewportPanel();
     RenderHierarchyPanel();
 }
-
 void MEngineEditor::RenderToolbarPanel()
 {
     ImGui::Begin("Toolbar", nullptr, ImGuiWindowFlags_None);
     ImGui::BeginGroup();
     {
-        auto sceneWindow = ImGui::FindWindowByName("Viewport");
-        ImGui::Text("SceneView Size: %1.f x %1.f", sceneWindow->ContentSize.x, sceneWindow->ContentSize.y);
-        ImGui::SameLine();
         ImGui::TextColored(ImVec4(1, 1, 0, 1), "FPS: %1.f", ImGui::GetIO().Framerate);
         if (ImGui::RadioButton("Translate", mGuizmoOperation == ImGuizmo::TRANSLATE) || ImGui::IsKeyDown(ImGuiKey_W))
             mGuizmoOperation = ImGuizmo::TRANSLATE;
@@ -586,29 +620,23 @@ void MEngineEditor::RenderToolbarPanel()
             mGuizmoMode = ImGuizmo::WORLD;
         ImGui::EndGroup();
     }
-    // ImGui::BeginGroup();
-    // {
-    //     if (ImGui::BeginCombo("Resolution", mCurrentResolution.ToString().c_str()))
-    //     {
-    //         for (Resolution &resolution : mResolutions)
-    //         {
-    //             if (ImGui::Selectable(resolution.ToString().data(), mCurrentResolution == resolution))
-    //             {
-    //                 mCurrentResolution = resolution;
-    //                 mRenderSystem->CreateFrameBuffer(resolution.width, resolution.height);
-    //                 auto &cameraComponent = registry->get<CameraComponent>(mEditorCamera);
-    //                 if (cameraComponent.isMainCamera)
-    //                 {
-    //                     cameraComponent.aspectRatio = static_cast<float>(resolution.width) / resolution.height;
-    //                     cameraComponent.dirty = true;
-    //                     break;
-    //                 }
-    //             }
-    //         }
-    //         ImGui::EndCombo();
-    //     }
-    //     ImGui::EndGroup();
-    // }
+    ImGui::BeginGroup();
+    {
+        if (ImGui::BeginCombo("Resolution", mCurrentResolution.ToString().c_str()))
+        {
+            for (Resolution &resolution : mResolutions)
+            {
+                if (ImGui::Selectable(resolution.ToString().data(), mCurrentResolution == resolution))
+                {
+                    mCurrentResolution = resolution;
+                    mRenderSystem->ReSizeFrameBuffer(resolution.width, resolution.height);
+                    SetViewPort();
+                }
+            }
+            ImGui::EndCombo();
+        }
+        ImGui::EndGroup();
+    }
     ImGui::End();
 }
 void MEngineEditor::RenderViewportPanel()
@@ -616,7 +644,8 @@ void MEngineEditor::RenderViewportPanel()
     ImGui::Begin("Viewport", nullptr, ImGuiWindowFlags_None);
     ImVec2 windowPos = ImGui::GetWindowPos();
     ImVec2 windowSize = ImGui::GetContentRegionAvail();
-    ImGui::Image(reinterpret_cast<ImTextureID>(mViewPortDescriptorSets[mCurrentFrameIndex]), windowSize, ImVec2(0, 1),
+    ImVec2 viewPortSize = {windowSize.x, windowSize.x * mCurrentResolution.height * 1.0f / mCurrentResolution.width};
+    ImGui::Image(reinterpret_cast<ImTextureID>(mViewPortDescriptorSets[mCurrentFrameIndex]), viewPortSize, ImVec2(0, 1),
                  ImVec2(1, 0));
     // 设置 ImGuizmo 绘制区域
     ImVec2 imagePos = ImGui::GetItemRectMin();
