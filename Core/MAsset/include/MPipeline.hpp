@@ -65,7 +65,22 @@ class MPipelineSetting final : public MAssetSetting
     bool LogicOpEnable = false;
     vk::LogicOp LogicOp = vk::LogicOp::eCopy;
     // set:1
-    std::vector<vk::DescriptorSetLayoutBinding> MaterialDescriptorSetLayoutBindings{};
+    std::vector<vk::DescriptorSetLayoutBinding> MaterialDescriptorSetLayoutBindings{
+
+        vk::DescriptorSetLayoutBinding{0, vk::DescriptorType::eUniformBuffer, 1,
+                                       vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
+        // Binding: 1 Albedo
+        vk::DescriptorSetLayoutBinding{1, vk::DescriptorType::eCombinedImageSampler, 1,
+                                       vk::ShaderStageFlagBits::eFragment},
+        // Binding: 2 Normal Map
+        vk::DescriptorSetLayoutBinding{2, vk::DescriptorType::eCombinedImageSampler, 1,
+                                       vk::ShaderStageFlagBits::eFragment},
+        // Binding: 3 ARM (Ambient Occlusion, Roughness, Metallic)
+        vk::DescriptorSetLayoutBinding{3, vk::DescriptorType::eCombinedImageSampler, 1,
+                                       vk::ShaderStageFlagBits::eFragment},
+        // Binding: 4 Emissive
+        vk::DescriptorSetLayoutBinding{4, vk::DescriptorType::eCombinedImageSampler, 1,
+                                       vk::ShaderStageFlagBits::eFragment}};
     ~MPipelineSetting() override = default;
 };
 class MPipeline : public MAsset

@@ -1,5 +1,6 @@
 #include "MAsset.hpp"
 #include "MCameraComponent.hpp"
+#include "MLightComponent.hpp"
 #include "MMaterial.hpp"
 #include "MMaterialComponent.hpp"
 #include "MMeshComponent.hpp"
@@ -290,6 +291,48 @@ static void RegisterComponent()
         .data<&MMaterialComponent::material>("material"_hs)
         .custom<Info>(Info{
             .DisplayName = "Material",
+            .Editable = true,
+            .Serializable = true,
+        });
+    entt::meta_factory<MLightComponent>()
+        .type("MLightComponent"_hs)
+        .custom<Info>(Info{
+            .DisplayName = "LightComponent",
+        })
+        .base<MComponent>()
+        .data<&MLightComponent::LightType>("LightType"_hs)
+        .custom<Info>(Info{
+            .DisplayName = "Light Type",
+            .Editable = true,
+            .Serializable = true,
+        })
+        .data<&MLightComponent::Intensity>("Intensity"_hs)
+        .custom<Info>(Info{
+            .DisplayName = "Intensity",
+            .Editable = true,
+            .Serializable = true,
+        })
+        .data<&MLightComponent::Color>("Color"_hs)
+        .custom<Info>(Info{
+            .DisplayName = "Color",
+            .Editable = true,
+            .Serializable = true,
+        })
+        .data<&MLightComponent::Radius>("Radius"_hs)
+        .custom<Info>(Info{
+            .DisplayName = "Radius",
+            .Editable = true,
+            .Serializable = true,
+        })
+        .data<&MLightComponent::InnerConeAngle>("InnerConeAngle"_hs)
+        .custom<Info>(Info{
+            .DisplayName = "Inner Cone Angle",
+            .Editable = true,
+            .Serializable = true,
+        })
+        .data<&MLightComponent::OuterConeAngle>("OuterConeAngle"_hs)
+        .custom<Info>(Info{
+            .DisplayName = "Outer Cone Angle",
             .Editable = true,
             .Serializable = true,
         });

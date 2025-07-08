@@ -24,7 +24,7 @@ class MTextureSetting final : public MAssetSetting
     uint32_t arrayLayers = 1;
     vk::Format format = vk::Format::eR8G8B8A8Srgb;
     vk::SampleCountFlagBits sampleCount = vk::SampleCountFlagBits::e1;
-    bool isShaderResource = false;
+    bool isShaderResource = true;
     bool isRenderTarget = false;
     bool isDepthStencil = false;
     bool isUAV = false;

@@ -32,8 +32,9 @@ class MPipelineManager final : public MManager<MPipeline, MPipelineSetting>, pub
         // Binding: 0 VP (View Projection Matrix)
         vk::DescriptorSetLayoutBinding{0, vk::DescriptorType::eUniformBuffer, 1,
                                        vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
-        // // Binding: 1 Light
-        // vk::DescriptorSetLayoutBinding{1, vk::DescriptorType::eUniformBuffer, 6, vk::ShaderStageFlagBits::eFragment},
+        // Binding: 1 Light
+        vk::DescriptorSetLayoutBinding{1, vk::DescriptorType::eUniformBuffer, 1,
+                                       vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
     };
     std::unordered_map<std::string, std::vector<vk::DescriptorSetLayoutBinding>> mDescriptorSetLayoutBindings{};
 

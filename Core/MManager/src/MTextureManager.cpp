@@ -315,7 +315,7 @@ void MTextureManager::CreateDefault()
     Remove(defaultTexture->GetID());
     defaultTexture->SetID(UUID{});
     mAssets[defaultTexture->GetID()] = defaultTexture;
-    auto whitePixel = std::vector<uint8_t>(4, 255);
+    auto whitePixel = GetWhiteData();
     Write(defaultTexture, whitePixel, TextureSize{defaultTextureSetting.width, defaultTextureSetting.height, 4});
 }
 } // namespace MEngine::Core::Manager

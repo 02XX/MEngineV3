@@ -32,6 +32,7 @@
 #include "TaskManager.hpp"
 #include "UUIDGenerator.hpp"
 #include "VulkanContext.hpp"
+#include <ImGuizmo.h>
 #include <boost/di.hpp>
 #include <cstddef>
 #include <cstdint>
@@ -86,6 +87,14 @@ void MEngineEditor::Init()
     auto cube = modelManager->CreateCube();
     auto registry = injector.create<std::shared_ptr<entt::registry>>();
     auto cubeGameObject = Function::Utils::EntityUtils::CreateEntity(registry, cube);
+    auto &cubeTransform = registry->get<MTransformComponent>(cubeGameObject);
+    cubeTransform.localPosition = glm::vec3(-2.0f, 0.0f, 0.0f);
+    auto lightGameObject = registry->create();
+    auto &lightTransform = registry->emplace<MTransformComponent>(lightGameObject, MTransformComponent{});
+    auto &lightComponent = registry->emplace<MLightComponent>(lightGameObject, MLightComponent{});
+    lightComponent.LightType = LightType::Directional;
+    lightTransform.name = "Directional Light";
+    lightTransform.localRotation = glm::quat(glm::vec3(0.0, -glm::half_pi<float>(), 0.0f));
     LogInfo("MEngine Editor initialized successfully");
 }
 void MEngineEditor::InitWindow()
@@ -195,6 +204,7 @@ void MEngineEditor::InitImGui()
         auto textureSetting = MTextureSetting{};
         textureSetting.width = 200;
         textureSetting.height = 200;
+        textureSetting.isShaderResource = true;
         mAssetIconTextures[type] =
             textureManager->Create(textureSetting, "AssetIcon_" + std::string(magic_enum::enum_name(type)));
         auto [W, H, C, data] = Utils::ImageUtil::LoadImage(path);
@@ -656,13 +666,13 @@ void MEngineEditor::RenderViewportPanel()
     if (mSelectedEntity != entt::null)
     {
         auto registry = injector.create<std::shared_ptr<entt::registry>>();
+        auto &cameraComponent = registry->get<MCameraComponent>(mEditorCameraEntity);
+        auto viewMatrix = cameraComponent.viewMatrix;
+        auto projectionMatrix = cameraComponent.projectionMatrix;
         if (registry->any_of<MTransformComponent>(mSelectedEntity))
         {
             auto &transform = registry->get<MTransformComponent>(mSelectedEntity);
-            auto &cameraComponent = registry->get<MCameraComponent>(mEditorCameraEntity);
             auto modelMatrix = transform.modelMatrix;
-            auto viewMatrix = cameraComponent.viewMatrix;
-            auto projectionMatrix = cameraComponent.projectionMatrix;
             ImGuizmo::Manipulate(glm::value_ptr(viewMatrix), glm::value_ptr(projectionMatrix), mGuizmoOperation,
                                  mGuizmoMode, glm::value_ptr(modelMatrix));
             if (ImGuizmo::IsUsing())
@@ -679,6 +689,53 @@ void MEngineEditor::RenderViewportPanel()
 
                     transform.dirty = true;
                 }
+            }
+        }
+        if (registry->all_of<MTransformComponent, MLightComponent>(mSelectedEntity))
+        {
+            auto &transformComponent = registry->get<MTransformComponent>(mSelectedEntity);
+            auto &lightComponent = registry->get<MLightComponent>(mSelectedEntity);
+            auto drawList = ImGui::GetWindowDrawList();
+            switch (lightComponent.LightType)
+            {
+            case Function::Component::LightType::Directional: {
+                auto modelMatrix = transformComponent.modelMatrix;
+                auto worldPositionStart4D = glm::vec4(transformComponent.worldPosition, 1.0f);
+                auto worldPositionEnd4D = glm::vec4(
+                    transformComponent.worldPosition + transformComponent.worldRotation * glm::vec3(0, 0, 1), 1.0f);
+                auto NDCStartPosition = projectionMatrix * viewMatrix * worldPositionStart4D;
+                auto NDCEndPosition = projectionMatrix * viewMatrix * worldPositionEnd4D;
+                NDCStartPosition /= NDCStartPosition.w; // 转换为NDC坐标
+                NDCEndPosition /= NDCEndPosition.w;     // 转换为NDC坐标
+                ImVec2 startPos = ImVec2((NDCStartPosition.x + 1.0f) * 0.5f * imageSize.x + imagePos.x,
+                                         (1.0f - (NDCStartPosition.y + 1.0f) * 0.5f) * imageSize.y + imagePos.y);
+                ImVec2 endPos = ImVec2((NDCEndPosition.x + 1.0f) * 0.5f * imageSize.x + imagePos.x,
+                                       (1.0f - (NDCEndPosition.y + 1.0f) * 0.5f) * imageSize.y + imagePos.y);
+                // 绘制光源方向线
+                drawList->AddLine(startPos, endPos, IM_COL32(255, 255, 0, 255), 2.0f);
+                // 绘制方向箭头（三角形）
+                float arrowSize = 8.0f;
+                ImVec2 dir = ImVec2(endPos.x - startPos.x, endPos.y - startPos.y);
+                float dirLength = sqrtf(dir.x * dir.x + dir.y * dir.y);
+                if (dirLength > 0.0f)
+                {
+                    dir.x /= dirLength; // 归一化
+                    dir.y /= dirLength;
+
+                    // 计算箭头两个侧边点
+                    ImVec2 arrowLeft = ImVec2(endPos.x - dir.x * arrowSize + dir.y * arrowSize * 0.5f,
+                                              endPos.y - dir.y * arrowSize - dir.x * arrowSize * 0.5f);
+                    ImVec2 arrowRight = ImVec2(endPos.x - dir.x * arrowSize - dir.y * arrowSize * 0.5f,
+                                               endPos.y - dir.y * arrowSize + dir.x * arrowSize * 0.5f);
+
+                    // 绘制填充三角形（黄色）
+                    drawList->AddTriangleFilled(endPos, arrowLeft, arrowRight, IM_COL32(255, 255, 0, 255));
+                }
+                break;
+            }
+            case Function::Component::LightType::Point:
+            case Function::Component::LightType::Spot:
+                break;
             }
         }
     }
@@ -819,6 +876,7 @@ void MEngineEditor::RenderHierarchyPanel()
 void MEngineEditor::RenderInspectorPanel()
 {
     ImGui::Begin("Inspector", nullptr, ImGuiWindowFlags_None);
+    auto vulkanContext = injector.create<std::shared_ptr<VulkanContext>>();
     if (ImGui::BeginTabBar("InspectorTabs"))
     {
         if (ImGui::BeginTabItem("Components"))
@@ -848,15 +906,35 @@ void MEngineEditor::RenderInspectorPanel()
                 }
                 if (registry->any_of<MMaterialComponent>(mSelectedEntity))
                 {
-                    auto &material = registry->get<MMaterialComponent>(mSelectedEntity);
-                    auto metaMaterial = entt::forward_as_meta(material);
-                    ReflectObject(metaMaterial, entt::resolve<MMaterialComponent>());
+                    auto &materialComponent = registry->get<MMaterialComponent>(mSelectedEntity);
+                    auto metaMaterial = entt::forward_as_meta(materialComponent);
+                    if (ReflectObject(metaMaterial, entt::resolve<MMaterialComponent>()))
+                    {
+                        vulkanContext->GetDevice().waitIdle();
+                        switch (materialComponent.material->GetMaterialType())
+                        {
+                        case Core::Asset::MMaterialType::Unknown:
+                        case Core::Asset::MMaterialType::PBR: {
+                            auto pbrMaterialManager = injector.create<std::shared_ptr<MPBRMaterialManager>>();
+                            if (auto pbrMaterial = std::dynamic_pointer_cast<MPBRMaterial>(materialComponent.material))
+                            {
+                                pbrMaterialManager->Write(pbrMaterial);
+                            }
+                            break;
+                        }
+                        case Core::Asset::MMaterialType::Unlit:
+                        case Core::Asset::MMaterialType::Custom:
+                            break;
+                        }
+                    }
                 }
                 if (registry->any_of<MLightComponent>(mSelectedEntity))
                 {
                     auto &light = registry->get<MLightComponent>(mSelectedEntity);
                     auto metaLight = entt::forward_as_meta(light);
-                    ReflectObject(metaLight, entt::resolve<MLightComponent>());
+                    if (ReflectObject(metaLight, entt::resolve<MLightComponent>()))
+                    {
+                    }
                 }
             }
             ImGui::EndTabItem();
@@ -1008,8 +1086,8 @@ void MEngineEditor::RenderAssetPanel()
             if (ImGui::MenuItem("New Pipeline"))
             {
                 auto pipelineSetting = MPipelineSetting{};
-                pipelineSetting.VertexShaderPath = "Assets/Shaders/Default.vert";
-                pipelineSetting.FragmentShaderPath = "Assets/Shaders/Default.frag";
+                pipelineSetting.VertexShaderPath = "Assets/Shaders/ForwardOpaquePBR.vert";
+                pipelineSetting.FragmentShaderPath = "Assets/Shaders/ForwardOpaquePBR.frag";
                 auto pipeline =
                     mAssetDatabase->CreateAsset<MPipeline>(mCurrentFolder->GetPath(), "New Pipeline", pipelineSetting);
                 mAssetDatabase->SaveAsset<MPipeline>(pipeline);
@@ -1169,10 +1247,6 @@ bool MEngineEditor::ReflectObject(entt::meta_any &instance, entt::meta_type type
                         auto pbrMaterialMeta = entt::forward_as_meta(*pbrMaterial);
                         if (ReflectObject(pbrMaterialMeta, entt::resolve<MPBRMaterial>()))
                         {
-                            auto vulkanContext = injector.create<std::shared_ptr<VulkanContext>>();
-                            auto pbrMaterialManager = injector.create<std::shared_ptr<MPBRMaterialManager>>();
-                            vulkanContext->GetDevice().waitIdle();
-                            pbrMaterialManager->Write(pbrMaterial);
                             isModified = true;
                         }
                         break;

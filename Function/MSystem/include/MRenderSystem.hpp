@@ -1,13 +1,17 @@
 #pragma once
 #include "IMPipelineManager.hpp"
+#include "MLightComponent.hpp"
 #include "MPipeline.hpp"
+#include "MPipelineManager.hpp"
 #include "MSystem.hpp"
 #include "MTexture.hpp"
 #include "RenderPassManager.hpp"
 #include "ResourceManager.hpp"
 #include "VulkanContext.hpp"
+#include <array>
 #include <cstdint>
 #include <entt/entity/fwd.hpp>
+#include <glm/ext/vector_float3.hpp>
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -78,9 +82,33 @@ class MRenderSystem final : public MSystem
     VmaAllocationInfo mLightUBOAllocationInfo;
     struct CameraParameters
     {
-        glm::mat4 ProjectionMatrix = glm::identity<glm::mat4>();
-        glm::mat4 ViewMatrix = glm::identity<glm::mat4>();
+        alignas(16) glm::vec3 Position = glm::vec3(0.0f);
+        alignas(16) glm::vec3 Direction = glm::vec3(0.0f, 0.0f, -1.0f);
+        alignas(16) glm::mat4 ProjectionMatrix = glm::identity<glm::mat4>();
+        alignas(16) glm::mat4 ViewMatrix = glm::identity<glm::mat4>();
     } mCameraParameters{};
+    static constexpr uint32_t MAX_LIGHT_COUNT = 6;
+    struct LightParameters
+    {
+        // base
+        Component::LightType LightType = Component::LightType::Directional;
+
+        float Intensity = 1.0f;
+
+        // point
+        float Radius = 10.0f;
+
+        // spot
+        float InnerConeAngle = 0.0f; // in radians
+        float OuterConeAngle = 0.0f; // in radians
+        int enable = 0;              // 是否启用光源，1表示启用，0表示禁用
+        alignas(16) glm::vec3 Color = glm::vec3(1.0f);
+
+        alignas(16) glm::vec3 Position = glm::vec3(0.0f);
+
+        alignas(16) glm::vec3 Direction = glm::vec3(0.0f, 0.0f, 1.0f);
+    };
+    std::array<LightParameters, MAX_LIGHT_COUNT> mLightParameters{};
 
   public:
     MRenderSystem(std::shared_ptr<VulkanContext> context, std::shared_ptr<entt::registry> registry,

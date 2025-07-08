@@ -4,11 +4,13 @@
 #include "MMaterialComponent.hpp"
 #include "MMeshComponent.hpp"
 #include "MPipeline.hpp"
+#include "MPipelineManager.hpp"
 #include "MTexture.hpp"
 #include "MTransformComponent.hpp"
 #include "MTransformSystem.hpp"
 #include "VulkanContext.hpp"
 #include <cstdint>
+#include <cstring>
 #include <glm/fwd.hpp>
 #include <vector>
 namespace MEngine::Function::System
@@ -63,6 +65,21 @@ void MRenderSystem::Init()
     {
         LogError("Failed to create camera UBO");
         throw std::runtime_error("Failed to create camera UBO");
+    }
+    vk::BufferCreateInfo lightUBOCreateInfo{};
+    lightUBOCreateInfo.setSize(sizeof(LightParameters) * MAX_LIGHT_COUNT)
+        .setUsage(vk::BufferUsageFlagBits::eUniformBuffer | vk::BufferUsageFlagBits::eTransferDst)
+        .setSharingMode(vk::SharingMode::eExclusive);
+    VmaAllocationCreateInfo lightUBOAllocationCreateInfo{};
+    lightUBOAllocationCreateInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
+    lightUBOAllocationCreateInfo.flags =
+        VMA_ALLOCATION_CREATE_MAPPED_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT;
+    if (vmaCreateBuffer(mVulkanContext->GetVmaAllocator(), &static_cast<VkBufferCreateInfo &>(lightUBOCreateInfo),
+                        &lightUBOAllocationCreateInfo, reinterpret_cast<VkBuffer *>(&mLightUBO), &mLightUBOAllocation,
+                        &mLightUBOAllocationInfo) != VK_SUCCESS)
+    {
+        LogError("Failed to create light UBO");
+        throw std::runtime_error("Failed to create light UBO");
     }
 }
 void MRenderSystem::Update(float deltaTime)
@@ -181,16 +198,38 @@ void MRenderSystem::Batch()
 void MRenderSystem::Prepare(vk::CommandBuffer commandBuffer, vk::Fence fence)
 {
     // 相机
-    auto view = mRegistry->view<MTransformComponent, MCameraComponent>();
-    for (auto camera : view)
+    auto cameraView = mRegistry->view<MTransformComponent, MCameraComponent>();
+    for (auto camera : cameraView)
     {
-        auto &transformComponent = view.get<MTransformComponent>(camera);
-        auto &cameraComponent = view.get<MCameraComponent>(camera);
+        auto &transformComponent = cameraView.get<MTransformComponent>(camera);
+        auto &cameraComponent = cameraView.get<MCameraComponent>(camera);
         if (cameraComponent.isMainCamera)
         {
+            mCameraParameters.Position = transformComponent.worldPosition;
+            mCameraParameters.Direction = transformComponent.worldRotation * glm::vec3(0.0f, 0.0f, -1.0f);
             mCameraParameters.ViewMatrix = cameraComponent.viewMatrix;
             mCameraParameters.ProjectionMatrix = cameraComponent.projectionMatrix;
         }
+    }
+    // 光照
+    auto lightView = mRegistry->view<MTransformComponent, MLightComponent>();
+    uint32_t lightCount = 0;
+    for (auto light : lightView)
+    {
+        auto &transformComponent = lightView.get<MTransformComponent>(light);
+        auto &lightComponent = lightView.get<MLightComponent>(light);
+        LightParameters lightParams;
+        lightParams.Position = transformComponent.worldPosition;
+        lightParams.Direction = transformComponent.worldRotation * glm::vec3(0.0f, 0.0f, 1.0f);
+        lightParams.Color = lightComponent.Color;
+        lightParams.Intensity = lightComponent.Intensity;
+        lightParams.Radius = lightComponent.Radius;
+        lightParams.InnerConeAngle = lightComponent.InnerConeAngle;
+        lightParams.OuterConeAngle = lightComponent.OuterConeAngle;
+        lightParams.LightType = lightComponent.LightType;
+        lightParams.enable = 1; // 启用光源
+        mLightParameters[lightCount] = lightParams;
+        lightCount++;
     }
     auto result = mVulkanContext->GetDevice().waitForFences({fence}, vk::True,
                                                             1000000000); // 1s
@@ -274,6 +313,8 @@ void MRenderSystem::End(vk::CommandBuffer commandBuffer, vk::Fence fence, vk::Se
 void MRenderSystem::WriteGlobalDescriptorSet(uint32_t globalDescriptorSetIndex)
 {
     memcpy(mCameraUBOAllocationInfo.pMappedData, &mCameraParameters, sizeof(CameraParameters));
+    memcpy(mLightUBOAllocationInfo.pMappedData, mLightParameters.data(), sizeof(LightParameters) * MAX_LIGHT_COUNT);
+
     // 更新全局描述集
     std::vector<vk::WriteDescriptorSet> writeDescriptorSets;
     writeDescriptorSets.resize(mPipelineManager->GetGlobalDescriptorSetLayoutBindings().size());
@@ -285,7 +326,18 @@ void MRenderSystem::WriteGlobalDescriptorSet(uint32_t globalDescriptorSetIndex)
         .setDstBinding(0)
         .setDstArrayElement(0)
         .setDescriptorType(vk::DescriptorType::eUniformBuffer)
-        .setDescriptorCount(mPipelineManager->GetGlobalDescriptorSetLayoutBindings().size());
+        .setDescriptorCount(1);
+    vk::DescriptorBufferInfo lightParamsBufferInfo;
+
+    lightParamsBufferInfo.setBuffer(mLightUBO).setOffset(0).setRange(sizeof(LightParameters) * MAX_LIGHT_COUNT);
+
+    writeDescriptorSets[1]
+        .setBufferInfo(lightParamsBufferInfo)
+        .setDstSet(mGlobalDescriptorSets[globalDescriptorSetIndex].get())
+        .setDstBinding(1)
+        .setDstArrayElement(0)
+        .setDescriptorType(vk::DescriptorType::eUniformBuffer)
+        .setDescriptorCount(1);
 
     mVulkanContext->GetDevice().updateDescriptorSets(writeDescriptorSets, {});
 }
