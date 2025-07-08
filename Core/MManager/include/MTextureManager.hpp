@@ -18,7 +18,7 @@ class MTextureManager final : public MManager<MTexture, MTextureSetting>, public
   public:
     MTextureManager(std::shared_ptr<VulkanContext> vulkanContext, std::shared_ptr<IUUIDGenerator> uuidGenerator);
     ~MTextureManager() override = default;
-    std::shared_ptr<MTexture> Create(const MTextureSetting &setting) override;
+    std::shared_ptr<MTexture> Create(const MTextureSetting &setting, const std::string &name = "New Texture") override;
     void Update(std::shared_ptr<MTexture> texture) override;
     // void Write(std::shared_ptr<MTexture> texture, const std::filesystem::path &path) override;
     void Write(std::shared_ptr<MTexture> texture, const std::vector<uint8_t> &data, const TextureSize &size) override;
@@ -26,6 +26,7 @@ class MTextureManager final : public MManager<MTexture, MTextureSetting>, public
     static vk::ImageUsageFlags PickImageUsage(const MTextureSetting &setting);
     static vk::ImageCreateFlags PickImageFlags(const MTextureSetting &setting);
     static vk::ImageAspectFlags GuessImageAspectFlags(vk::Format format);
+    void CreateDefault() override;
 };
 
 } // namespace MEngine::Core::Manager

@@ -118,10 +118,11 @@ MTextureManager::MTextureManager(std::shared_ptr<VulkanContext> vulkanContext,
         LogError("Failed to create fence for MTextureManager");
         throw std::runtime_error("Failed to create fence for MTextureManager");
     }
+    CreateDefault();
 }
-std::shared_ptr<MTexture> MTextureManager::Create(const MTextureSetting &setting)
+std::shared_ptr<MTexture> MTextureManager::Create(const MTextureSetting &setting, const std::string &name)
 {
-    auto texture = std::make_shared<MTexture>(mUUIDGenerator->Create(), mVulkanContext, setting);
+    auto texture = std::make_shared<MTexture>(mUUIDGenerator->Create(), name, mVulkanContext, setting);
     vk::ImageCreateInfo imageCreateInfo{};
     imageCreateInfo.setImageType(TextureTypeToImageType(texture->mSetting.ImageType))
         .setExtent({setting.width, setting.height, 1})
@@ -181,6 +182,7 @@ std::shared_ptr<MTexture> MTextureManager::Create(const MTextureSetting &setting
     {
         LogError("Failed to create texture image view");
     }
+    mAssets[texture->GetID()] = texture;
     return texture;
 }
 void MTextureManager::Update(std::shared_ptr<MTexture> texture)
@@ -289,5 +291,18 @@ void MTextureManager::Write(std::shared_ptr<MTexture> texture, const std::vector
     }
     // 清理临时资源
     vmaDestroyBuffer(mVulkanContext->GetVmaAllocator(), stagingBuffer, stagingAllocation);
+}
+void MTextureManager::CreateDefault()
+{
+    auto defaultTextureSetting = MTextureSetting();
+    defaultTextureSetting.width = 1;
+    defaultTextureSetting.height = 1;
+    defaultTextureSetting.format = vk::Format::eR8G8B8A8Unorm;
+    auto defaultTexture = Create(defaultTextureSetting, "Default Texture");
+    Remove(defaultTexture->GetID());
+    defaultTexture->SetID(UUID{});
+    mAssets[defaultTexture->GetID()] = defaultTexture;
+    auto whitePixel = std::vector<uint8_t>(4, 255);
+    Write(defaultTexture, whitePixel, TextureSize{defaultTextureSetting.width, defaultTextureSetting.height, 4});
 }
 } // namespace MEngine::Core::Manager

@@ -5,7 +5,7 @@
 using namespace MEngine::Core::Asset;
 namespace MEngine::Core::Manager
 {
-class IMModelManager : public IMManager<MModel, MModelSetting>
+class IMModelManager : public virtual IMManager<MModel, MModelSetting>
 {
   public:
     ~IMModelManager() override = default;

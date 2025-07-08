@@ -194,7 +194,8 @@ void MEngineEditor::InitImGui()
         auto textureSetting = MTextureSetting{};
         textureSetting.width = 200;
         textureSetting.height = 200;
-        mAssetIconTextures[type] = textureManager->Create(textureSetting);
+        mAssetIconTextures[type] =
+            textureManager->Create(textureSetting, "AssetIcon_" + std::string(magic_enum::enum_name(type)));
         auto [W, H, C, data] = Utils::ImageUtil::LoadImage(path);
         textureManager->Write(
             mAssetIconTextures[type], data,
@@ -411,6 +412,7 @@ void MEngineEditor::Shutdown()
         glfwDestroyWindow(mWindow);
         mWindow = nullptr;
     }
+    mRenderSystem->Shutdown();
     mIsRunning = false;
     LogInfo("MEngine Editor shutdown successfully");
 }
@@ -614,7 +616,8 @@ void MEngineEditor::RenderViewportPanel()
     ImGui::Begin("Viewport", nullptr, ImGuiWindowFlags_None);
     ImVec2 windowPos = ImGui::GetWindowPos();
     ImVec2 windowSize = ImGui::GetContentRegionAvail();
-    ImGui::Image(reinterpret_cast<ImTextureID>(mViewPortDescriptorSets[mCurrentFrameIndex]), windowSize);
+    ImGui::Image(reinterpret_cast<ImTextureID>(mViewPortDescriptorSets[mCurrentFrameIndex]), windowSize, ImVec2(0, 1),
+                 ImVec2(1, 0));
     // 设置 ImGuizmo 绘制区域
     ImVec2 imagePos = ImGui::GetItemRectMin();
     ImVec2 imageSize = ImGui::GetItemRectSize();

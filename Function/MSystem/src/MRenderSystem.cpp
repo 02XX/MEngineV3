@@ -1,5 +1,6 @@
 #include "MRenderSystem.hpp"
 #include "Logger.hpp"
+#include "MCameraComponent.hpp"
 #include "MMaterialComponent.hpp"
 #include "MMeshComponent.hpp"
 #include "MPipeline.hpp"
@@ -8,7 +9,8 @@
 #include "MTransformSystem.hpp"
 #include "VulkanContext.hpp"
 #include <cstdint>
-
+#include <glm/fwd.hpp>
+#include <vector>
 namespace MEngine::Function::System
 {
 void MRenderSystem::Init()
@@ -21,19 +23,46 @@ void MRenderSystem::Init()
     {
         // 创建命令缓冲区
         vk::CommandBufferAllocateInfo graphicsCommandBufferAllocateInfo;
-        graphicsCommandBufferAllocateInfo.setCommandPool(mContext->GetGraphicsCommandPool())
+        graphicsCommandBufferAllocateInfo.setCommandPool(mVulkanContext->GetGraphicsCommandPool())
             .setLevel(vk::CommandBufferLevel::ePrimary)
             .setCommandBufferCount(1);
         mGraphicsCommandBuffers.push_back(
-            std::move(mContext->GetDevice().allocateCommandBuffersUnique(graphicsCommandBufferAllocateInfo)[0]));
+            std::move(mVulkanContext->GetDevice().allocateCommandBuffersUnique(graphicsCommandBufferAllocateInfo)[0]));
 
         // 创建同步对象
         vk::FenceCreateInfo fenceCreateInfo;
         fenceCreateInfo.setFlags(vk::FenceCreateFlagBits::eSignaled);
-        mInFlightFences.push_back(mContext->GetDevice().createFenceUnique(fenceCreateInfo));
+        mInFlightFences.push_back(mVulkanContext->GetDevice().createFenceUnique(fenceCreateInfo));
 
         vk::SemaphoreCreateInfo semaphoreCreateInfo;
-        mRenderFinishedSemaphores[i] = mContext->GetDevice().createSemaphoreUnique(semaphoreCreateInfo);
+        mRenderFinishedSemaphores[i] = mVulkanContext->GetDevice().createSemaphoreUnique(semaphoreCreateInfo);
+
+        vk::DescriptorSetAllocateInfo descriptorSetAllocateInfo;
+        auto globalDescriptorSetLayouts =
+            std::vector<vk::DescriptorSetLayout>{mPipelineManager->GetGlobalDescriptorSetLayout()};
+        descriptorSetAllocateInfo.setDescriptorPool(mVulkanContext->GetDescriptorPool())
+            .setDescriptorSetCount(1)
+            .setSetLayouts(globalDescriptorSetLayouts);
+        auto descriptorSets = mVulkanContext->GetDevice().allocateDescriptorSetsUnique(descriptorSetAllocateInfo);
+        if (!descriptorSets.empty())
+        {
+            mGlobalDescriptorSets.push_back(std::move(descriptorSets[0]));
+        }
+    }
+    vk::BufferCreateInfo cameraUBOCreateInfo{};
+    cameraUBOCreateInfo.setSize(sizeof(CameraParameters))
+        .setUsage(vk::BufferUsageFlagBits::eUniformBuffer | vk::BufferUsageFlagBits::eTransferDst)
+        .setSharingMode(vk::SharingMode::eExclusive);
+    VmaAllocationCreateInfo cameraUBOAllocationCreateInfo{};
+    cameraUBOAllocationCreateInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
+    cameraUBOAllocationCreateInfo.flags =
+        VMA_ALLOCATION_CREATE_MAPPED_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT;
+    if (vmaCreateBuffer(mVulkanContext->GetVmaAllocator(), &static_cast<VkBufferCreateInfo &>(cameraUBOCreateInfo),
+                        &cameraUBOAllocationCreateInfo, reinterpret_cast<VkBuffer *>(&mCameraUBO),
+                        &mCameraUBOAllocation, &mCameraUBOAllocationInfo) != VK_SUCCESS)
+    {
+        LogError("Failed to create camera UBO");
+        throw std::runtime_error("Failed to create camera UBO");
     }
 }
 void MRenderSystem::Update(float deltaTime)
@@ -46,10 +75,10 @@ void MRenderSystem::Update(float deltaTime)
     auto height = mRenderTargets[mCurrentFrameIndex].height;
     auto renderFinishedSemaphore = mRenderFinishedSemaphores[mCurrentFrameIndex].get();
     auto imageAvailableSemaphore = mImageAvailableSemaphores[mCurrentFrameIndex];
+    auto globalDescriptorSet = mGlobalDescriptorSets[mCurrentFrameIndex].get();
     Prepare(commandBuffer, inFlightFence);
-    for (const auto &[pipelineID, entities] : mRenderQueue)
+    for (const auto &[pipeline, entities] : mRenderQueue)
     {
-        auto pipeline = mResourceManager->GetAsset<MPipeline>(pipelineID);
         auto renderPassType = pipeline->GetSetting().RenderPassType;
         switch (renderPassType)
         {
@@ -58,7 +87,8 @@ void MRenderSystem::Update(float deltaTime)
             break;
         case RenderPassType::ForwardComposition: {
             auto framebuffer = mFramebuffers[RenderPassType::ForwardComposition][mCurrentFrameIndex].get();
-            RenderForwardCompositePass(commandBuffer, {width, height}, framebuffer, pipeline->GetPipeline(), entities);
+            RenderForwardCompositePass(commandBuffer, {width, height}, framebuffer, pipeline->GetPipeline(),
+                                       globalDescriptorSet, entities);
             break;
         }
         case RenderPassType::Sky:
@@ -73,6 +103,14 @@ void MRenderSystem::Update(float deltaTime)
 }
 void MRenderSystem::Shutdown()
 {
+    if (mCameraUBO)
+    {
+        vmaDestroyBuffer(mVulkanContext->GetVmaAllocator(), mCameraUBO, mCameraUBOAllocation);
+    }
+    if (mLightUBO)
+    {
+        vmaDestroyBuffer(mVulkanContext->GetVmaAllocator(), mLightUBO, mLightUBOAllocation);
+    }
 }
 void MRenderSystem::CreateRenderTarget()
 {
@@ -110,7 +148,7 @@ void MRenderSystem::CreateFramebuffer()
             .setHeight(mRenderTargets[i].height)
             .setLayers(1);
         mFramebuffers[RenderPassType::ForwardComposition][i] =
-            mContext->GetDevice().createFramebufferUnique(framebufferCreateInfo);
+            mVulkanContext->GetDevice().createFramebufferUnique(framebufferCreateInfo);
     }
 }
 void MRenderSystem::Batch()
@@ -123,26 +161,40 @@ void MRenderSystem::Batch()
         auto &transformComponent = view.get<MTransformComponent>(entity);
         auto &meshComponent = view.get<MMeshComponent>(entity);
         auto &materialComponent = view.get<MMaterialComponent>(entity);
-        mRenderQueue[materialComponent.material->GetPipelineID()].push_back(entity);
+        mRenderQueue[materialComponent.material->GetPipeline()].push_back(entity);
     }
 }
 void MRenderSystem::Prepare(vk::CommandBuffer commandBuffer, vk::Fence fence)
 {
-    auto result = mContext->GetDevice().waitForFences({fence}, vk::True,
-                                                      1000000000); // 1s
+    // 相机
+    auto view = mRegistry->view<MTransformComponent, MCameraComponent>();
+    for (auto camera : view)
+    {
+        auto &transformComponent = view.get<MTransformComponent>(camera);
+        auto &cameraComponent = view.get<MCameraComponent>(camera);
+        if (cameraComponent.isMainCamera)
+        {
+            mCameraParameters.ViewMatrix = cameraComponent.viewMatrix;
+            mCameraParameters.ProjectionMatrix = cameraComponent.projectionMatrix;
+        }
+    }
+    auto result = mVulkanContext->GetDevice().waitForFences({fence}, vk::True,
+                                                            1000000000); // 1s
     if (result != vk::Result::eSuccess)
     {
         LogError("MRenderSystem::Prepare", "Failed to wait for in-flight fence: {}", vk::to_string(result));
         throw std::runtime_error("Failed to wait fence");
     }
-    mContext->GetDevice().resetFences({fence});
+    mVulkanContext->GetDevice().resetFences({fence});
     commandBuffer.reset();
     vk::CommandBufferBeginInfo beginInfo;
     beginInfo.setFlags(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
     commandBuffer.begin(beginInfo);
+    WriteGlobalDescriptorSet(mCurrentFrameIndex);
 }
 void MRenderSystem::RenderForwardCompositePass(vk::CommandBuffer commandBuffer, vk::Extent2D extent,
                                                vk::Framebuffer framebuffer, vk::Pipeline pipeline,
+                                               vk::DescriptorSet globalDescriptorSet,
                                                const std::vector<entt::entity> &entities)
 {
     vk::RenderPassBeginInfo renderPassBeginInfo;
@@ -153,6 +205,7 @@ void MRenderSystem::RenderForwardCompositePass(vk::CommandBuffer commandBuffer, 
         .setFramebuffer(framebuffer)
         .setRenderArea({{0, 0}, {width, height}})
         .setClearValues(clearValues);
+
     commandBuffer.beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
     vk::Viewport viewport;
     viewport.setX(0.0f)
@@ -172,8 +225,17 @@ void MRenderSystem::RenderForwardCompositePass(vk::CommandBuffer commandBuffer, 
         auto &meshComponent = mRegistry->get<MMeshComponent>(entity);
         auto &transformComponent = mRegistry->get<MTransformComponent>(entity);
         // 1. 绑定 push_constants
+        commandBuffer.pushConstants(materialComponent.material->GetPipeline()->GetPipelineLayout(),
+                                    vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment, 0,
+                                    sizeof(glm::mat4), &transformComponent.modelMatrix);
         // 2. 绑定Global描述符集
+        commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+                                         materialComponent.material->GetPipeline()->GetPipelineLayout(), 0,
+                                         globalDescriptorSet, {});
         // 3. 绑定材质描述符集
+        commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+                                         materialComponent.material->GetPipeline()->GetPipelineLayout(), 1,
+                                         materialComponent.material->GetMaterialDescriptorSet(), {});
         // 4. 绑定顶点缓冲区
         auto vertexBuffer = meshComponent.mesh->GetVertexBuffer();
         commandBuffer.bindVertexBuffers(0, vertexBuffer, {0});
@@ -193,6 +255,24 @@ void MRenderSystem::End(vk::CommandBuffer commandBuffer, vk::Fence fence, vk::Se
     vk::SubmitInfo submitInfo;
     vk::PipelineStageFlags waitStage = vk::PipelineStageFlagBits::eColorAttachmentOutput;
     submitInfo.setCommandBuffers(commandBuffer).setSignalSemaphores(signalSemaphore);
-    mContext->GetGraphicsQueue().submit(submitInfo, fence);
+    mVulkanContext->GetGraphicsQueue().submit(submitInfo, fence);
+}
+void MRenderSystem::WriteGlobalDescriptorSet(uint32_t globalDescriptorSetIndex)
+{
+    memcpy(mCameraUBOAllocationInfo.pMappedData, &mCameraParameters, sizeof(CameraParameters));
+    // 更新全局描述集
+    std::vector<vk::WriteDescriptorSet> writeDescriptorSets;
+    writeDescriptorSets.resize(mPipelineManager->GetGlobalDescriptorSetLayoutBindings().size());
+    vk::DescriptorBufferInfo cameraParamsBufferInfo;
+    cameraParamsBufferInfo.setBuffer(mCameraUBO).setOffset(0).setRange(sizeof(CameraParameters));
+    writeDescriptorSets[0]
+        .setBufferInfo(cameraParamsBufferInfo)
+        .setDstSet(mGlobalDescriptorSets[globalDescriptorSetIndex].get())
+        .setDstBinding(0)
+        .setDstArrayElement(0)
+        .setDescriptorType(vk::DescriptorType::eUniformBuffer)
+        .setDescriptorCount(mPipelineManager->GetGlobalDescriptorSetLayoutBindings().size());
+
+    mVulkanContext->GetDevice().updateDescriptorSets(writeDescriptorSets, {});
 }
 } // namespace MEngine::Function::System

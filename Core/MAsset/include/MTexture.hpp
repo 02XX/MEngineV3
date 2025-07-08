@@ -64,8 +64,9 @@ class MTexture final : public MAsset
     VmaAllocationInfo mAllocationInfo{};
 
   public:
-    MTexture(const UUID &id, std::shared_ptr<VulkanContext> vulkanContext, const MTextureSetting &setting)
-        : MAsset(id), mSetting(setting), mVulkanContext(vulkanContext)
+    MTexture(const UUID &id, const std::string &name, std::shared_ptr<VulkanContext> vulkanContext,
+             const MTextureSetting &setting)
+        : MAsset(id, name), mSetting(setting), mVulkanContext(vulkanContext)
     {
         mType = MAssetType::Texture;
         mState = MAssetState::Unloaded;

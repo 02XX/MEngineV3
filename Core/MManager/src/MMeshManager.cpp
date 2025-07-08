@@ -28,12 +28,11 @@ MMeshManager::MMeshManager(std::shared_ptr<VulkanContext> vulkanContext, std::sh
         LogError("Failed to create fence for MTextureManager");
         throw std::runtime_error("Failed to create fence for MTextureManager");
     }
+    CreateDefault();
 }
-std::shared_ptr<MMesh> MMeshManager::Create(const MMeshSetting &setting)
+std::shared_ptr<MMesh> MMeshManager::Create(const MMeshSetting &setting, const std::string &name)
 {
-    std::shared_ptr<MMesh> mesh = std::make_shared<MMesh>(
-        mUUIDGenerator->Create(), mVulkanContext, setting
-    );
+    std::shared_ptr<MMesh> mesh = std::make_shared<MMesh>(mUUIDGenerator->Create(), name, mVulkanContext, setting);
     vk::BufferCreateInfo vertexBufferCreateInfo{};
     vertexBufferCreateInfo.setSize(setting.vertexBufferSize)
         .setUsage(vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eTransferDst)
@@ -60,6 +59,7 @@ std::shared_ptr<MMesh> MMeshManager::Create(const MMeshSetting &setting)
         LogError("Failed to create index buffer for mesh");
         throw std::runtime_error("Failed to create index buffer for mesh");
     }
+    mAssets[mesh->GetID()] = mesh;
     return mesh;
 }
 void MMeshManager::WriteBuffer(vk::Buffer buffer, void *data, uint32_t size)
@@ -113,5 +113,8 @@ void MMeshManager::Write(std::shared_ptr<MMesh> mesh, const std::vector<Vertex> 
     // index Staging buffer
     WriteBuffer(mesh->GetIndexBuffer(), const_cast<uint32_t *>(indices.data()),
                 static_cast<uint32_t>(indices.size() * sizeof(uint32_t)));
+}
+void MMeshManager::CreateDefault()
+{
 }
 }; // namespace MEngine::Core::Manager

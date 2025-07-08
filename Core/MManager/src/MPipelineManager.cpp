@@ -1,47 +1,75 @@
 #include "MPipelineManager.hpp"
 #include "Logger.hpp"
+#include "MPBRMaterial.hpp"
 #include "ShaderUtils.hpp"
+#include "VMA.hpp"
 #include "Vertex.hpp"
+#include <cstring>
 #include <fstream>
 #include <memory>
+#include <vector>
 
 namespace MEngine::Core::Manager
 {
-std::shared_ptr<MPipeline> MPipelineManager::Create(const MPipelineSetting &setting)
+const std::string PipelineType::ForwardOpaquePBR = "ForwardOpaquePBR";
+const std::string PipelineType::ForwardTransparentPBR = "ForwardTransparentPBR";
+
+MPipelineManager::MPipelineManager(std::shared_ptr<VulkanContext> vulkanContext,
+                                   std::shared_ptr<IUUIDGenerator> uuidGenerator,
+                                   std::shared_ptr<RenderPassManager> renderPassManager)
+    : MManager(vulkanContext, uuidGenerator), mRenderPassManager(renderPassManager)
 {
-    auto pipeline = std::shared_ptr<MPipeline>(new MPipeline(mUUIDGenerator->Create(), setting));
+    vk::DescriptorSetLayoutCreateInfo globalDescriptorSetLayoutCreateInfo;
+    globalDescriptorSetLayoutCreateInfo.setBindings(mGlobalDescriptorSetLayoutBindings)
+        .setFlags(vk::DescriptorSetLayoutCreateFlagBits::eUpdateAfterBindPool);
+    auto globalDescriptorSetLayout =
+        mVulkanContext->GetDevice().createDescriptorSetLayoutUnique(globalDescriptorSetLayoutCreateInfo);
+    if (!globalDescriptorSetLayout)
+    {
+        LogError("Failed to create descriptor set layout");
+        throw std::runtime_error("Failed to create descriptor set layout");
+    }
+    mGlobalDescriptorSetLayout = std::move(globalDescriptorSetLayout);
+    CreateDefault();
+}
+std::shared_ptr<MPipeline> MPipelineManager::Create(const MPipelineSetting &setting, const std::string &name)
+{
+    auto pipeline = std::make_shared<MPipeline>(mUUIDGenerator->Create(), name, mVulkanContext, setting);
     // 创建着色器模块
     // vertex shader
     pipeline->mVertexShaderModule = CreateShaderModule(setting.VertexShaderPath);
     // fragment shader
     pipeline->mFragmentShaderModule = CreateShaderModule(setting.FragmentShaderPath);
-    LogInfo("Shader modules created successfully: {} and {}", setting.VertexShaderPath.string(),
-            setting.FragmentShaderPath.string());
+    LogDebug("Shader modules created successfully: {} and {}", setting.VertexShaderPath.string(),
+             setting.FragmentShaderPath.string());
     // 创建pipeline layout
-    //      创建DescriptorSetLayout
-    for (auto &&descriptorSetLayoutBinding : setting.DescriptorSetLayoutBindings)
+    vk::DescriptorSetLayoutCreateInfo materialDescriptorSetLayoutCreateInfo;
+    materialDescriptorSetLayoutCreateInfo.setBindings(setting.MaterialDescriptorSetLayoutBindings)
+        .setFlags(vk::DescriptorSetLayoutCreateFlagBits::eUpdateAfterBindPool);
+    auto materialDescriptorSetLayout =
+        mVulkanContext->GetDevice().createDescriptorSetLayoutUnique(materialDescriptorSetLayoutCreateInfo);
+    if (!materialDescriptorSetLayout)
     {
-        vk::DescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo;
-        descriptorSetLayoutCreateInfo.setBindings(descriptorSetLayoutBinding);
-        auto descriptorSetLayout =
-            mVulkanContext->GetDevice().createDescriptorSetLayoutUnique(descriptorSetLayoutCreateInfo);
-        if (!descriptorSetLayout)
-        {
-            LogError("Failed to create descriptor set layout");
-            throw std::runtime_error("Failed to create descriptor set layout");
-        }
-        pipeline->mDescriptorSetLayouts.push_back(std::move(descriptorSetLayout));
+        LogError("Failed to create material descriptor set layout");
+        throw std::runtime_error("Failed to create material descriptor set layout");
     }
+    pipeline->mMaterialDescriptorSetLayouts = std::move(materialDescriptorSetLayout);
+
     vk::PipelineLayoutCreateInfo pipelineLayoutCreateInfo;
-    auto descriptorSetLayouts = pipeline->GetDescriptorSetLayouts();
-    pipelineLayoutCreateInfo.setSetLayouts(descriptorSetLayouts);
+    auto descriptorSetLayouts = std::vector<vk::DescriptorSetLayout>{mGlobalDescriptorSetLayout.get(),
+                                                                     pipeline->GetMaterialDescriptorSetLayout()};
+    vk::PushConstantRange pushConstantRange;
+    pushConstantRange.setSize(sizeof(glm::mat4))
+        .setOffset(0)
+        .setStageFlags(vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment);
+    pipelineLayoutCreateInfo.setSetLayouts(descriptorSetLayouts).setPushConstantRanges(pushConstantRange);
     auto pipelineLayout = mVulkanContext->GetDevice().createPipelineLayoutUnique(pipelineLayoutCreateInfo);
     if (!pipelineLayout)
     {
         LogError("Failed to create pipeline layout");
         throw std::runtime_error("Failed to create pipeline layout");
     }
-    LogInfo("Pipeline layout created successfully");
+    LogDebug("Pipeline layout created successfully");
     pipeline->mPipelineLayout = std::move(pipelineLayout);
     // 创建pipeline
     // ========== 1. 顶点输入状态 ==========
@@ -135,12 +163,20 @@ std::shared_ptr<MPipeline> MPipelineManager::Create(const MPipelineSetting &sett
         LogError("Failed to create Forward Forward Opaque PBR pipeline");
     }
     pipeline->mPipeline = std::move(pipelineResult.value);
-    LogInfo("Forward Opaque PBR pipeline created successfully");
+    mAssets[pipeline->GetID()] = pipeline;
+    mPipelines[pipeline->GetName()] = pipeline;
+    mMaterialDescriptorSetLayouts[pipeline->GetName()] = pipeline->mMaterialDescriptorSetLayouts.get();
+    LogDebug("Create pipeline: {}", pipeline->GetName());
     return pipeline;
 }
 vk::UniqueShaderModule MPipelineManager::CreateShaderModule(const std::filesystem::path &shaderPath) const
 
 {
+    if (!std::filesystem::exists(shaderPath))
+    {
+        LogError("Shader file does not exist: {}", shaderPath.string());
+        throw std::runtime_error("Shader file does not exist: " + shaderPath.string());
+    }
     auto extension = shaderPath.extension();
     std::ifstream shaderFile(shaderPath, std::ios::in);
     if (!shaderFile.is_open())
@@ -163,6 +199,67 @@ vk::UniqueShaderModule MPipelineManager::CreateShaderModule(const std::filesyste
         LogError("Failed to create shader module from file: {}", shaderPath.string());
         throw std::runtime_error("Failed to create shader module from file: " + shaderPath.string());
     }
+
     return shaderModule;
 }
+void MPipelineManager::Remove(const std::string &name)
+{
+    auto pipeline = Get(name);
+    if (!pipeline)
+    {
+        LogError("Failed to remove pipeline: Pipeline with name {} does not exist", name);
+        return;
+    }
+    Remove(pipeline->GetID());
+}
+std::shared_ptr<MPipeline> MPipelineManager::Get(const std::string &name) const
+{
+    if (mPipelines.contains(name))
+    {
+        return mPipelines.at(name);
+    }
+    return nullptr;
+}
+void MPipelineManager::Remove(const UUID &id)
+{
+    auto pipeline = Get(id);
+    if (!pipeline)
+    {
+        LogError("Failed to remove pipeline: Pipeline with ID {} does not exist", id.ToString());
+        return;
+    }
+    if (mPipelines.contains(pipeline->GetName()))
+    {
+        mPipelines.erase(pipeline->GetName());
+    }
+    Remove(id);
+}
+void MPipelineManager::CreateDefault()
+{
+    // ForwardOpaquePBR
+
+    std::vector<vk::DescriptorSetLayoutBinding> mDescriptorSetLayoutBindings{
+
+        vk::DescriptorSetLayoutBinding{0, vk::DescriptorType::eUniformBuffer, 1,
+                                       vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
+        // Binding: 1 Albedo
+        vk::DescriptorSetLayoutBinding{1, vk::DescriptorType::eCombinedImageSampler, 1,
+                                       vk::ShaderStageFlagBits::eFragment},
+        // Binding: 2 Normal Map
+        vk::DescriptorSetLayoutBinding{2, vk::DescriptorType::eCombinedImageSampler, 1,
+                                       vk::ShaderStageFlagBits::eFragment},
+        // Binding: 3 ARM (Ambient Occlusion, Roughness, Metallic)
+        vk::DescriptorSetLayoutBinding{3, vk::DescriptorType::eCombinedImageSampler, 1,
+                                       vk::ShaderStageFlagBits::eFragment},
+        // Binding: 4 Emissive
+        vk::DescriptorSetLayoutBinding{4, vk::DescriptorType::eCombinedImageSampler, 1,
+                                       vk::ShaderStageFlagBits::eFragment}};
+    auto pbrSetting = MPipelineSetting{};
+    pbrSetting.VertexShaderPath = "Assets/Shaders/ForwardOpaquePBR.vert";
+    pbrSetting.FragmentShaderPath = "Assets/Shaders/ForwardOpaquePBR.frag";
+    pbrSetting.RenderPassType = RenderPassType::ForwardComposition;
+    pbrSetting.MaterialDescriptorSetLayoutBindings = mDescriptorSetLayoutBindings;
+    auto pbrPipeline = Create(pbrSetting, PipelineType::ForwardOpaquePBR);
+}
+
 } // namespace MEngine::Core::Manager

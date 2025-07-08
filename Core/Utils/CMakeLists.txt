@@ -5,6 +5,6 @@ find_package(unofficial-shaderc CONFIG REQUIRED)
 
 add_library(Utils ${RESOURCE})
 target_include_directories(Utils PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
-target_link_libraries(Utils PRIVATE unofficial::shaderc::shaderc)
+target_link_libraries(Utils PRIVATE unofficial::shaderc::shaderc Common)
 target_include_directories(Utils PRIVATE ${Stb_INCLUDE_DIR})
 

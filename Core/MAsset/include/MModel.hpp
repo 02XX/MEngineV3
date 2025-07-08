@@ -35,7 +35,7 @@ class MModel : public MAsset
     MModelSetting mSetting{};
 
   public:
-    MModel(const UUID &id, const MModelSetting &setting) : MAsset(id), mSetting(setting)
+    MModel(const UUID &id, const std::string &name, const MModelSetting &setting) : MAsset(id, name), mSetting(setting)
     {
         mType = MAssetType::Model;
         mState = MAssetState::Unloaded;

@@ -21,11 +21,12 @@ class MMeshManager final : public MManager<MMesh, MMeshSetting>, public IMMeshMa
   public:
     MMeshManager(std::shared_ptr<VulkanContext> vulkanContext, std::shared_ptr<IUUIDGenerator> uuidGenerator);
     ~MMeshManager() override = default;
-    std::shared_ptr<MMesh> Create(const MMeshSetting &setting) override;
+    std::shared_ptr<MMesh> Create(const MMeshSetting &setting, const std::string &name = "New Mesh") override;
     void Update(std::shared_ptr<MMesh> mesh) override
     {
     }
     void Write(std::shared_ptr<MMesh> mesh, const std::vector<Vertex> &vertices,
                const std::vector<uint32_t> &indices) override;
+    void CreateDefault() override;
 };
 } // namespace MEngine::Core::Manager

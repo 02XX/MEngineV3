@@ -1,14 +1,15 @@
 #include "MModelManager.hpp"
 #include "MMesh.hpp"
 #include "MModel.hpp"
+#include "UUID.hpp"
 #include <memory>
 
 namespace MEngine::Core::Manager
 {
 
-std::shared_ptr<MModel> MModelManager::Create(const MModelSetting &setting)
+std::shared_ptr<MModel> MModelManager::Create(const MModelSetting &setting, const std::string &name)
 {
-    return std::make_shared<MModel>(mUUIDGenerator->Create(), setting);
+    return std::make_shared<MModel>(mUUIDGenerator->Create(), name, setting);
 }
 
 std::shared_ptr<MModel> MModelManager::CreateCube()
@@ -70,12 +71,13 @@ std::shared_ptr<MModel> MModelManager::CreateCube()
     auto meshSetting = MMeshSetting{};
     meshSetting.vertexBufferSize = vertices.size() * sizeof(Vertex);
     meshSetting.indexBufferSize = indices.size() * sizeof(uint32_t);
-    auto mesh = mMeshManager->Create(meshSetting);
+    auto mesh = mMeshManager->Create(meshSetting, "Cube Mesh");
     mesh->SetVertices(vertices);
     mesh->SetIndices(indices);
     mMeshManager->Write(mesh, vertices, indices);
-    auto pbrMaterial = mMaterialManager->Create({});
-    auto model = std::make_shared<MModel>(MModel(mUUIDGenerator->Create(), {}));
+    auto pbrMaterial = mMaterialManager->Get(UUID{});
+    mMaterialManager->Write(pbrMaterial);
+    auto model = std::make_shared<MModel>(mUUIDGenerator->Create(), "Cube Model", MModelSetting{});
     model->mMeshes.emplace_back(mesh);
     model->mMaterials.emplace_back(pbrMaterial);
     std::unique_ptr<Node> rootNode = std::make_unique<Node>();
@@ -84,6 +86,11 @@ std::shared_ptr<MModel> MModelManager::CreateCube()
     rootNode->MaterialIndex = 0;           // 第一个材质的索引
     rootNode->Transform = glm::mat4(1.0f); // 单位
     model->mRootNode = std::move(rootNode);
+    mAssets[model->GetID()] = model;
     return model;
+}
+void MModelManager::CreateDefault()
+{
+    // CreateCube();
 }
 } // namespace MEngine::Core::Manager

@@ -46,7 +46,7 @@ TEST_F(VulkanContextTest, SurfaceCreation)
     std::shared_ptr<VulkanContextConfig> config = std::make_shared<VulkanContextConfig>();
     config->InstanceRequiredExtensions = extensions;
     config->InstanceRequiredLayers = {"VK_LAYER_KHRONOS_validation"};
-    std::shared_ptr<VulkanContext> context = std::make_shared<VulkanContext>(config);
+    std::shared_ptr<VulkanContext> context = std::make_shared<VulkanContext>();
     VkSurfaceKHR surface;
     glfwCreateWindowSurface(context->GetInstance(), window, nullptr, &surface);
     context->InitSurface(surface);

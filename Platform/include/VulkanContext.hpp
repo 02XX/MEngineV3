@@ -46,6 +46,7 @@ class VulkanContext
     vk::Queue TransferQueue;
     vk::Queue PresentQueue;
     uint32_t Version = 0;
+    vk::UniqueDescriptorPool DescriptorPool;
 
     // VMA
     VmaAllocator VmaAllocator;
@@ -129,6 +130,10 @@ class VulkanContext
     {
         return SurfaceInfo;
     }
+    inline const vk::DescriptorPool GetDescriptorPool() const
+    {
+        return DescriptorPool.get();
+    }
 
   private:
     void CreateInstance();
@@ -143,6 +148,7 @@ class VulkanContext
     void RecreateSwapchain();
     void CreateSwapchainImages();
     void CreateSwapchainImageViews();
+    void CreateDescriptorPool();
 
   public:
     VulkanContext();

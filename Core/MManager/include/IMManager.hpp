@@ -3,6 +3,7 @@
 
 #include <concepts>
 #include <memory>
+#include <vector>
 
 using namespace MEngine::Core::Asset;
 namespace MEngine::Core::Manager
@@ -22,9 +23,11 @@ class IMManager : public IMManagerBase
      *
      * @return std::shared_ptr<MAsset>
      */
-    virtual std::shared_ptr<TAsset> Create(const TSetting &setting) = 0;
-
+    virtual std::shared_ptr<TAsset> Create(const TSetting &setting, const std::string &name) = 0;
+    virtual std::shared_ptr<TAsset> Get(const UUID &id) const = 0;
+    virtual std::vector<std::shared_ptr<TAsset>> GetAll() const = 0;
     virtual void Update(std::shared_ptr<TAsset> asset) = 0;
-    
+    virtual void Remove(const UUID &id) = 0;
+    virtual void CreateDefault() = 0;
 };
 } // namespace MEngine::Core::Manager

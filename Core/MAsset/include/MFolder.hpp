@@ -21,14 +21,14 @@ class MFolder : public MAsset
     std::shared_ptr<MFolder> mParentFolder;
     std::vector<std::shared_ptr<MAsset>> mChildren;
 
-  private:
-    MFolder(const UUID &id, const MFolderSetting &setting) : MAsset(id), mSetting(setting)
+  public:
+    MFolder(const UUID &id, const std::string &name, const MFolderSetting &setting)
+        : MAsset(id, name), mSetting(setting)
     {
         mType = MAssetType::Folder;
         mState = MAssetState::Unloaded;
     }
 
-  public:
     ~MFolder() override = default;
     inline std::shared_ptr<MFolder> GetParentFolder() const
     {

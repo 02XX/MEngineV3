@@ -22,12 +22,14 @@ class MModelManager final : public MManager<MModel, MModelSetting>, public IMMod
         : MManager<MModel, MModelSetting>(vulkanContext, uuidGenerator), mMeshManager(meshManager),
           mMaterialManager(materialManager)
     {
+        CreateDefault();
     }
     ~MModelManager() override = default;
-    std::shared_ptr<MModel> Create(const MModelSetting &setting) override;
+    std::shared_ptr<MModel> Create(const MModelSetting &setting, const std::string &name = "New Model") override;
     void Update(std::shared_ptr<MModel> model) override
     {
     }
     std::shared_ptr<MModel> CreateCube() override;
+    void CreateDefault() override;
 };
 } // namespace MEngine::Core::Manager

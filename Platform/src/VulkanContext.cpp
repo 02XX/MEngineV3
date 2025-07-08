@@ -24,6 +24,7 @@ void VulkanContext::Init()
     GetQueues();
     CreateCommandPools();
     CreateVMA();
+    CreateDescriptorPool();
     if (Surface)
     {
         QuerySurfaceInfo();
@@ -454,5 +455,39 @@ void VulkanContext::CreateSwapchainImageViews()
     }
     LogTrace("Swapchain Image Count: {}", mSwapchainImageViews.size());
     LogDebug("Swapchain Image Views Created");
+}
+void VulkanContext::CreateDescriptorPool()
+{
+    auto maxDescriptorSize = 1000;
+    std::vector<std::pair<vk::DescriptorType, float>> proportion = {
+        {vk::DescriptorType::eSampler, 0.5f},
+        {vk::DescriptorType::eCombinedImageSampler, 4.0f},
+        {vk::DescriptorType::eSampledImage, 4.0f},
+        {vk::DescriptorType::eStorageImage, 1.0f},
+        {vk::DescriptorType::eUniformBuffer, 2.0f},
+        {vk::DescriptorType::eStorageBuffer, 2.0f},
+        {vk::DescriptorType::eUniformBufferDynamic, 1.0f},
+        {vk::DescriptorType::eStorageBufferDynamic, 1.0f},
+    };
+
+    std::vector<vk::DescriptorPoolSize> descriptorPoolSize;
+    descriptorPoolSize.reserve(proportion.size());
+    for (auto &proportion : proportion)
+    {
+        descriptorPoolSize.emplace_back(proportion.first, static_cast<uint32_t>(proportion.second * maxDescriptorSize));
+    }
+    vk::DescriptorPoolCreateInfo descriptorPoolCreateInfo;
+    descriptorPoolCreateInfo
+        .setPoolSizes(descriptorPoolSize) // 设置池中各类描述符的数量
+        .setMaxSets(maxDescriptorSize)    // 设置池最多可分配的 Descriptor Set 数量
+        .setFlags(vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet |
+                  vk::DescriptorPoolCreateFlagBits::eUpdateAfterBind); // 设置池的标志位
+    DescriptorPool = Device->createDescriptorPoolUnique(descriptorPoolCreateInfo);
+    if (!DescriptorPool)
+    {
+        LogError("Failed to create descriptor pool");
+        throw std::runtime_error("Failed to create descriptor pool");
+    }
+    LogDebug("Descriptor Pool created successfully");
 }
 } // namespace MEngine

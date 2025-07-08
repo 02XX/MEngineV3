@@ -5,7 +5,7 @@
 using namespace MEngine::Core::Asset;
 namespace MEngine::Core::Manager
 {
-class IMFolderManager : public IMManager<MFolder, MFolderSetting>
+class IMFolderManager : public virtual IMManager<MFolder, MFolderSetting>
 {
   public:
     ~IMFolderManager() override = default;

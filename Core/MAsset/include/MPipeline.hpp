@@ -1,10 +1,19 @@
 #pragma once
 #include "MAsset.hpp"
 #include "MManager_fwd.hpp"
+#include "VMA.hpp"
+#include "VulkanContext.hpp"
 
+#include "Math.hpp"
+#include <glm/detail/qualifier.hpp>
+#include <glm/ext/matrix_transform.hpp>
+#include <glm/fwd.hpp>
+#include <memory>
 #include <nlohmann/json_fwd.hpp>
 #include <ranges>
+#include <string>
 #include <vector>
+#include <vulkan/vulkan_handles.hpp>
 
 namespace MEngine::Core::Asset
 {
@@ -19,6 +28,7 @@ enum class RenderPassType
     PostProcess,         // 后处理渲染subpass0: 后处理渲染
     UI,                  // UI渲染subpass0: UI渲染
 };
+
 class MPipelineSetting final : public MAssetSetting
 {
   public:
@@ -54,33 +64,8 @@ class MPipelineSetting final : public MAssetSetting
     bool ColorBlendingEnable = false;
     bool LogicOpEnable = false;
     vk::LogicOp LogicOp = vk::LogicOp::eCopy;
-
-    std::vector<std::vector<vk::DescriptorSetLayoutBinding>> DescriptorSetLayoutBindings{
-        // set:0
-        {{
-            // binding: 0 MVP
-            vk::DescriptorSetLayoutBinding{0, vk::DescriptorType::eUniformBuffer, 1,
-                                           vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
-            // binding: 1 Light
-            vk::DescriptorSetLayoutBinding{1, vk::DescriptorType::eUniformBuffer, 6,
-                                           vk::ShaderStageFlagBits::eFragment},
-        }},
-        // set:1
-        {{// Binding: 0 Parameters
-          vk::DescriptorSetLayoutBinding{0, vk::DescriptorType::eUniformBuffer, 1,
-                                         vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
-          // Binding: 1 Albedo
-          vk::DescriptorSetLayoutBinding{1, vk::DescriptorType::eCombinedImageSampler, 1,
-                                         vk::ShaderStageFlagBits::eFragment},
-          // Binding: 2 Normal Map
-          vk::DescriptorSetLayoutBinding{2, vk::DescriptorType::eCombinedImageSampler, 1,
-                                         vk::ShaderStageFlagBits::eFragment},
-          // Binding: 3 ARM (Ambient Occlusion, Roughness, Metallic)
-          vk::DescriptorSetLayoutBinding{3, vk::DescriptorType::eCombinedImageSampler, 1,
-                                         vk::ShaderStageFlagBits::eFragment},
-          // Binding: 4 Emissive
-          vk::DescriptorSetLayoutBinding{4, vk::DescriptorType::eCombinedImageSampler, 1,
-                                         vk::ShaderStageFlagBits::eFragment}}}};
+    // set:1
+    std::vector<vk::DescriptorSetLayoutBinding> MaterialDescriptorSetLayoutBindings{};
     ~MPipelineSetting() override = default;
 };
 class MPipeline : public MAsset
@@ -89,20 +74,22 @@ class MPipeline : public MAsset
     friend class Manager::MPipelineManager;
 
   private:
+    std::shared_ptr<VulkanContext> mVulkanContext;
     MPipelineSetting mSetting{};
     // vulkan
     vk::UniqueShaderModule mVertexShaderModule;
     vk::UniqueShaderModule mFragmentShaderModule;
     vk::UniquePipelineLayout mPipelineLayout;
     vk::UniquePipeline mPipeline;
+    vk::UniqueDescriptorSetLayout mMaterialDescriptorSetLayouts;
 
-  private:
-    MPipeline(const UUID &id, const MPipelineSetting &setting) : MAsset(id), mSetting(setting)
+  public:
+    MPipeline(const UUID &id, const std::string &name, std::shared_ptr<VulkanContext> vulkanContext,
+              const MPipelineSetting &setting)
+        : MAsset(id, name), mVulkanContext(vulkanContext), mSetting(setting)
     {
         mType = MAssetType::Shader;
     }
-
-  public:
     ~MPipeline() override = default;
     inline const MPipelineSetting &GetSetting() const
     {
@@ -127,6 +114,14 @@ class MPipeline : public MAsset
     inline const vk::PipelineLayout GetPipelineLayout() const
     {
         return mPipelineLayout.get();
+    }
+    inline const vk::DescriptorSetLayout GetMaterialDescriptorSetLayout() const
+    {
+        return mMaterialDescriptorSetLayouts.get();
+    }
+    inline const std::vector<vk::DescriptorSetLayoutBinding> &GetMaterialDescriptorSetLayoutBindings() const
+    {
+        return mSetting.MaterialDescriptorSetLayoutBindings;
     }
 };
 } // namespace MEngine::Core::Asset

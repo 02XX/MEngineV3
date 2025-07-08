@@ -18,9 +18,10 @@ class MFolderManager final : public MManager<MFolder, MFolderSetting>, public IM
     {
     }
     ~MFolderManager() override = default;
-    std::shared_ptr<MFolder> Create(const MFolderSetting &setting) override;
+    std::shared_ptr<MFolder> Create(const MFolderSetting &setting, const std::string &name) override;
     void Update(std::shared_ptr<MFolder> folder) override
     {
     }
+    void CreateDefault() override;
 };
 } // namespace MEngine::Core::Manager

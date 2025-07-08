@@ -1,4 +1,5 @@
 #pragma once
+#include "IMPipelineManager.hpp"
 #include "MPipeline.hpp"
 #include "MSystem.hpp"
 #include "MTexture.hpp"
@@ -8,6 +9,7 @@
 #include <cstdint>
 #include <entt/entity/fwd.hpp>
 #include <memory>
+#include <string>
 #include <unordered_map>
 #include <vector>
 
@@ -16,7 +18,8 @@ namespace MEngine::Function::System
 class MRenderSystem final : public MSystem
 {
   private:
-    std::shared_ptr<VulkanContext> mContext;
+    std::shared_ptr<VulkanContext> mVulkanContext;
+    std::shared_ptr<IMPipelineManager> mPipelineManager;
     std::shared_ptr<RenderPassManager> mRenderPassManager;
 
   private:
@@ -26,8 +29,7 @@ class MRenderSystem final : public MSystem
     std::vector<vk::UniqueFence> mInFlightFences;
     std::vector<vk::Semaphore> mImageAvailableSemaphores;
     std::vector<vk::UniqueSemaphore> mRenderFinishedSemaphores;
-    std::unordered_map<UUID, std::vector<entt::entity>> mRenderQueue;
-
+    std::unordered_map<std::shared_ptr<MPipeline>, std::vector<entt::entity>> mRenderQueue;
     struct RenderTarget
     {
         uint32_t width{1280};
@@ -66,11 +68,27 @@ class MRenderSystem final : public MSystem
     std::vector<RenderTarget> mRenderTargets;
     std::unordered_map<RenderPassType, std::vector<vk::UniqueFramebuffer>> mFramebuffers;
 
+    entt::entity mMainCameraEntity{};
+    std::vector<vk::UniqueDescriptorSet> mGlobalDescriptorSets;
+    vk::Buffer mCameraUBO;
+    VmaAllocation mCameraUBOAllocation;
+    VmaAllocationInfo mCameraUBOAllocationInfo;
+    vk::Buffer mLightUBO;
+    VmaAllocation mLightUBOAllocation;
+    VmaAllocationInfo mLightUBOAllocationInfo;
+    struct CameraParameters
+    {
+        glm::mat4 ProjectionMatrix = glm::identity<glm::mat4>();
+        glm::mat4 ViewMatrix = glm::identity<glm::mat4>();
+    } mCameraParameters{};
+
   public:
     MRenderSystem(std::shared_ptr<VulkanContext> context, std::shared_ptr<entt::registry> registry,
                   std::shared_ptr<ResourceManager> resourceManager,
-                  std::shared_ptr<RenderPassManager> renderPassManager)
-        : MSystem(registry, resourceManager), mContext(context), mRenderPassManager(renderPassManager)
+                  std::shared_ptr<RenderPassManager> renderPassManager,
+                  std::shared_ptr<IMPipelineManager> pipelineManager)
+        : MSystem(registry, resourceManager), mVulkanContext(context), mRenderPassManager(renderPassManager),
+          mPipelineManager(pipelineManager)
     {
     }
     ~MRenderSystem() override = default;
@@ -109,9 +127,11 @@ class MRenderSystem final : public MSystem
     void Batch();
     void Prepare(vk::CommandBuffer commandBuffer, vk::Fence fence);
     void RenderForwardCompositePass(vk::CommandBuffer commandBuffer, vk::Extent2D extent, vk::Framebuffer framebuffer,
-                                    vk::Pipeline pipeline, const std::vector<entt::entity> &entities);
+                                    vk::Pipeline pipeline, vk::DescriptorSet globalDescriptorSet,
+                                    const std::vector<entt::entity> &entities);
     void End(vk::CommandBuffer commandBuffer, vk::Fence fence, vk::Semaphore signalSemaphore,
              vk::Semaphore waitSemaphore);
+    void WriteGlobalDescriptorSet(uint32_t globalDescriptorSetIndex);
     // void RenderPostProcessPass();
 };
 } // namespace MEngine::Function::System

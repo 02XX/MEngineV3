@@ -7,9 +7,18 @@ layout(location = 2) in vec2 inTexCoords; // Location 2
 layout(location = 2) out vec3 fragNormal; // Location 2
 layout(location = 3) out vec2 fragTexCoords; // Location 3
 
+layout(std140,set = 0, binding = 0) uniform CameraParameters
+{
+    mat4 projectionMatrix;
+    mat4 viewMatrix;
+} cameraParams;
+layout(push_constant) uniform PushConstant
+{
+    mat4 modelMatrix;
+} pushConstants;
 void main()
 {
-    gl_Position = vec4(inPosition, 1.0);
+    gl_Position = cameraParams.projectionMatrix * cameraParams.viewMatrix * pushConstants.modelMatrix * vec4(inPosition, 1.0);
 }
 
 

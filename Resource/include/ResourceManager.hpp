@@ -39,7 +39,6 @@ class ResourceManager final
     std::shared_ptr<IMPipelineManager> mPipelineManager;
 
   private:
-    std::unordered_map<std::type_index, std::unordered_map<UUID, std::shared_ptr<MAsset>>> mAssets;
     std::unordered_map<std::type_index, std::shared_ptr<IMManagerBase>> mManagers;
 
   public:
@@ -93,18 +92,14 @@ class ResourceManager final
             LogError("Manager for asset type {} not found.", typeid(TAsset).name());
             throw std::runtime_error("Manager for asset type " + std::string(typeid(TAsset).name()) + " not found.");
         }
-        auto asset = manager->Create(setting);
-        mAssets[typeid(TAsset)][asset->GetID()] = asset;
+        auto asset = manager->Create(setting, "New Asset");
         return asset;
     }
     template <std::derived_from<MAsset> TAsset> std::shared_ptr<TAsset> GetAsset(const UUID &id) const
     {
         auto typeIndex = std::type_index(typeid(TAsset));
-        if (mAssets.contains(typeIndex) && mAssets.at(typeIndex).contains(id))
-        {
-            return std::static_pointer_cast<TAsset>(mAssets.at(typeIndex).at(id));
-        }
-        return nullptr;
+        auto manager = std::static_pointer_cast<IMManager<TAsset, MAssetSetting>>(mManagers.at(typeIndex));
+        return manager->Get(id);
     }
     void UpdateAsset(const UUID &id);
     void DeleteAsset(const UUID &id);

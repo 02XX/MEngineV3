@@ -41,8 +41,9 @@ class MMesh : public MAsset
     MMeshSetting mSetting;
 
   public:
-    MMesh(const UUID &id, std::shared_ptr<VulkanContext> vulkanContext, const MMeshSetting &setting)
-        : MAsset(id), mSetting(setting), mVulkanContext(vulkanContext)
+    MMesh(const UUID &id, const std::string &name, std::shared_ptr<VulkanContext> vulkanContext,
+          const MMeshSetting &setting)
+        : MAsset(id, name), mSetting(setting), mVulkanContext(vulkanContext)
     {
         mType = MAssetType::Mesh;
         mState = MAssetState::Unloaded;

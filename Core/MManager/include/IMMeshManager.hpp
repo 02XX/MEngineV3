@@ -6,7 +6,7 @@
 using namespace MEngine::Core::Asset;
 namespace MEngine::Core::Manager
 {
-class IMMeshManager : public IMManager<MMesh, MMeshSetting>
+class IMMeshManager : public virtual IMManager<MMesh, MMeshSetting>
 {
   public:
     ~IMMeshManager() override = default;

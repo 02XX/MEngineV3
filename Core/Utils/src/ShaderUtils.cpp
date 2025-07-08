@@ -1,4 +1,5 @@
 #include "ShaderUtils.hpp"
+#include "Logger.hpp"
 #include <stdexcept>
 
 namespace MEngine::Core::Utils
@@ -30,6 +31,7 @@ shaderc::SpvCompilationResult ShaderUtils::CompileShader(const std::string &sour
     shaderc::SpvCompilationResult result = compiler.CompileGlslToSpv(source, kind, name.c_str(), options);
     if (result.GetCompilationStatus() != shaderc_compilation_status_success)
     {
+        LogError("Shader compilation failed: {}", result.GetErrorMessage());
         throw std::runtime_error("Shader compilation failed: " + result.GetErrorMessage());
     }
     return result;
