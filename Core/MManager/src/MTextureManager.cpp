@@ -125,9 +125,22 @@ MTextureManager::MTextureManager(std::shared_ptr<VulkanContext> vulkanContext,
 std::shared_ptr<MTexture> MTextureManager::Create(const MTextureSetting &setting, const std::string &name)
 {
     auto texture = std::make_shared<MTexture>(mUUIDGenerator->Create(), name, mVulkanContext, setting);
+    mAssets[texture->GetID()] = texture;
+    return texture;
+}
+void MTextureManager::Update(std::shared_ptr<MTexture> texture)
+{
+}
+void MTextureManager::CreateVulkanResources(std::shared_ptr<MTexture> texture)
+{
+    if (texture->mImage)
+    {
+        VkImage image = texture->mImage;
+        vmaDestroyImage(mVulkanContext->GetVmaAllocator(), image, texture->mAllocation);
+    }
     vk::ImageCreateInfo imageCreateInfo{};
     imageCreateInfo.setImageType(TextureTypeToImageType(texture->mSetting.ImageType))
-        .setExtent({setting.width, setting.height, 1})
+        .setExtent({texture->mSetting.width, texture->mSetting.height, 1})
         .setMipLevels(texture->mSetting.mipmapLevels)
         .setArrayLayers(texture->mSetting.arrayLayers)
         .setFormat(texture->mSetting.format)
@@ -194,38 +207,7 @@ std::shared_ptr<MTexture> MTextureManager::Create(const MTextureSetting &setting
             ImGui_ImplVulkan_AddTexture(texture->mSampler.get(), texture->mImageView.get(),
                                         static_cast<VkImageLayout>(vk::ImageLayout::eShaderReadOnlyOptimal));
     }
-    mAssets[texture->GetID()] = texture;
-    return texture;
 }
-void MTextureManager::Update(std::shared_ptr<MTexture> texture)
-{
-    auto newTexture = Create(texture->mSetting);
-    if (texture->mImage)
-    {
-        VkImage image = texture->mImage;
-        vmaDestroyImage(mVulkanContext->GetVmaAllocator(), image, texture->mAllocation);
-    }
-    texture->mImage = std::move(newTexture->mImage);
-    texture->mAllocation = std::move(newTexture->mAllocation);
-    texture->mAllocationInfo = std::move(newTexture->mAllocationInfo);
-    texture->mSampler = std::move(newTexture->mSampler);
-    texture->mImageView = std::move(newTexture->mImageView);
-    texture->mSetting = newTexture->mSetting;
-}
-// void MTextureManager::Write(std::shared_ptr<MTexture> texture, const std::filesystem::path &path)
-// {
-//     stbi_set_unpremultiply_on_load(true);
-//     int width, height, channels;
-//     unsigned char *data = stbi_load(path.string().c_str(), &width, &height, &channels, STBI_rgb_alpha);
-//     if (!data)
-//     {
-//         LogError("Failed to load texture image");
-//         return;
-//     }
-//     TextureSize size{static_cast<uint32_t>(width), static_cast<uint32_t>(height), static_cast<uint32_t>(channels)};
-//     Write(texture, std::vector<uint8_t>(data, data + width * height * channels), size);
-//     stbi_image_free(data);
-// }
 void MTextureManager::Write(std::shared_ptr<MTexture> texture, const std::vector<uint8_t> &data,
                             const TextureSize &size)
 {
@@ -306,16 +288,82 @@ void MTextureManager::Write(std::shared_ptr<MTexture> texture, const std::vector
 }
 void MTextureManager::CreateDefault()
 {
-    auto defaultTextureSetting = MTextureSetting();
-    defaultTextureSetting.width = 1;
-    defaultTextureSetting.height = 1;
-    defaultTextureSetting.format = vk::Format::eR8G8B8A8Unorm;
-    defaultTextureSetting.isShaderResource = true;
-    auto defaultTexture = Create(defaultTextureSetting, "Default Texture");
-    Remove(defaultTexture->GetID());
-    defaultTexture->SetID(UUID{});
-    mAssets[defaultTexture->GetID()] = defaultTexture;
-    auto whitePixel = GetWhiteData();
-    Write(defaultTexture, whitePixel, TextureSize{defaultTextureSetting.width, defaultTextureSetting.height, 4});
+    mDefaultTextures[DefaultTextureType::White] = CreateWhiteTexture();
+    mDefaultTextures[DefaultTextureType::Black] = CreateBlackTexture();
+    mDefaultTextures[DefaultTextureType::Normal] = CreateNormalTexture();
+    mDefaultTextures[DefaultTextureType::Emissive] = CreateEmissiveTexture();
+    mDefaultTextures[DefaultTextureType::Albedo] = CreateAlbedoTexture();
+    mDefaultTextures[DefaultTextureType::ARM] = CreateARMTexture();
+
+    auto noColorTextureSetting = MTextureSetting();
+    noColorTextureSetting.width = 1;
+    noColorTextureSetting.height = 1;
+    noColorTextureSetting.format = vk::Format::eR8G8B8A8Unorm;
+    noColorTextureSetting.isShaderResource = true;
+    auto noColorTexture = Create(noColorTextureSetting, "No Texture");
+    Remove(noColorTexture->GetID());
+    noColorTexture->SetID(UUID{});
+    mAssets[noColorTexture->GetID()] = noColorTexture;
+    auto magentaPixel = std::vector<uint8_t>{255, 0, 255, 255}; // Magenta color
+    CreateVulkanResources(noColorTexture);
+    Write(noColorTexture, magentaPixel, TextureSize{noColorTextureSetting.width, noColorTextureSetting.height, 4});
+}
+std::shared_ptr<MTexture> MTextureManager::CreateWhiteTexture()
+{
+    auto whiteTextureSetting = MTextureSetting();
+    auto whiteTexture = Create(whiteTextureSetting, "Default White Texture");
+    CreateVulkanResources(whiteTexture);
+    Write(whiteTexture, GetWhiteData(), TextureSize{whiteTextureSetting.width, whiteTextureSetting.height, 4});
+    return whiteTexture;
+}
+std::shared_ptr<MTexture> MTextureManager::CreateBlackTexture()
+{
+    auto blackTextureSetting = MTextureSetting();
+    auto blackTexture = Create(blackTextureSetting, "Default Black Texture");
+    CreateVulkanResources(blackTexture);
+    Write(blackTexture, GetBlackData(), TextureSize{blackTextureSetting.width, blackTextureSetting.height, 4});
+    return blackTexture;
+}
+std::shared_ptr<MTexture> MTextureManager::CreateNormalTexture()
+{
+    auto normalTextureSetting = MTextureSetting();
+    auto normalTexture = Create(normalTextureSetting, "Default Normal Texture");
+    CreateVulkanResources(normalTexture);
+    Write(normalTexture, GetNormalData(), TextureSize{normalTextureSetting.width, normalTextureSetting.height, 4});
+    return normalTexture;
+}
+std::shared_ptr<MTexture> MTextureManager::CreateEmissiveTexture()
+{
+    auto emissiveTextureSetting = MTextureSetting();
+    auto emissiveTexture = Create(emissiveTextureSetting, "Default Emissive Texture");
+    CreateVulkanResources(emissiveTexture);
+    Write(emissiveTexture, GetEmissiveData(),
+          TextureSize{emissiveTextureSetting.width, emissiveTextureSetting.height, 4});
+    return emissiveTexture;
+}
+std::shared_ptr<MTexture> MTextureManager::CreateAlbedoTexture()
+{
+    auto albedoTextureSetting = MTextureSetting();
+    auto albedoTexture = Create(albedoTextureSetting, "Default Albedo Texture");
+    CreateVulkanResources(albedoTexture);
+    Write(albedoTexture, GetAlbedoData(), TextureSize{albedoTextureSetting.width, albedoTextureSetting.height, 4});
+    return albedoTexture;
+}
+std::shared_ptr<MTexture> MTextureManager::CreateARMTexture()
+{
+    auto armTextureSetting = MTextureSetting();
+    auto armTexture = Create(armTextureSetting, "Default ARM Texture");
+    CreateVulkanResources(armTexture);
+    Write(armTexture, GetARMData(), TextureSize{armTextureSetting.width, armTextureSetting.height, 4});
+    return armTexture;
+}
+std::shared_ptr<MTexture> MTextureManager::GetDefaultTexture(DefaultTextureType type) const
+{
+    if (mDefaultTextures.find(type) != mDefaultTextures.end())
+    {
+        return mDefaultTextures.at(type);
+    }
+    LogError("Default texture type {} not found", static_cast<int>(type));
+    return nullptr;
 }
 } // namespace MEngine::Core::Manager

@@ -1,5 +1,6 @@
 #include "MPBRMaterialManager.hpp"
 #include "MPBRMaterial.hpp"
+#include "MPipeline.hpp"
 #include "MPipelineManager.hpp"
 #include "UUID.hpp"
 #include "VMA.hpp"
@@ -10,15 +11,11 @@ namespace MEngine::Core::Manager
 {
 std::shared_ptr<MPBRMaterial> MPBRMaterialManager::Create(const MPBRMaterialSetting &setting, const std::string &name)
 {
-    auto defaultTexture = mTextureManager->Get(UUID{});
-    auto defaultPipeline = mPipelineManager->Get(PipelineType::ForwardOpaquePBR);
     auto pbrMaterial = std::make_shared<MPBRMaterial>(mUUIDGenerator->Create(), name, mVulkanContext, setting);
-    pbrMaterial->mPipeline = defaultPipeline;
-    pbrMaterial->mTextures.Albedo = defaultTexture;
-    pbrMaterial->mTextures.Normal = defaultTexture;
-    pbrMaterial->mTextures.ARM = defaultTexture;
-    pbrMaterial->mTextures.Emissive = defaultTexture;
-    pbrMaterial->mPipeline = defaultPipeline;
+    return pbrMaterial;
+}
+void MPBRMaterialManager::CreateVulkanResources(std::shared_ptr<MPBRMaterial> pbrMaterial)
+{
     vk::DescriptorSetAllocateInfo descriptorSetAllocateInfo;
     auto descriptorSetLayouts =
         std::vector<vk::DescriptorSetLayout>{pbrMaterial->GetPipeline()->GetMaterialDescriptorSetLayout()};
@@ -44,10 +41,13 @@ std::shared_ptr<MPBRMaterial> MPBRMaterialManager::Create(const MPBRMaterialSett
         LogError("Failed to create params UBO for PBR material");
         throw std::runtime_error("Failed to create params UBO for PBR material");
     }
-    return pbrMaterial;
 }
 void MPBRMaterialManager::Write(std::shared_ptr<MPBRMaterial> material)
 {
+    material->mTextures.Albedo = mTextureManager->Get(material->mTextures.AlbedoID);
+    material->mTextures.Normal = mTextureManager->Get(material->mTextures.NormalID);
+    material->mTextures.ARM = mTextureManager->Get(material->mTextures.ARMID);
+    material->mTextures.Emissive = mTextureManager->Get(material->mTextures.EmissiveID);
     // 写入材质参数
     memcpy(material->mParamsUBOAllocationInfo.pMappedData, &material->mProperties, sizeof(MPBRMaterialProperties));
 
@@ -111,10 +111,24 @@ void MPBRMaterialManager::Write(std::shared_ptr<MPBRMaterial> material)
 
 void MPBRMaterialManager::CreateDefault()
 {
-    auto pbrMaterialSetting = MPBRMaterialSetting();
-    auto pbrMaterial = Create(pbrMaterialSetting, "Default PBR Material");
-    Remove(pbrMaterial->GetID());
-    pbrMaterial->SetID(UUID{});
-    mAssets[pbrMaterial->GetID()] = pbrMaterial;
+}
+std::shared_ptr<MPBRMaterial> MPBRMaterialManager::CreateDefaultMaterial()
+{
+    auto defaultMaterialSetting = MPBRMaterialSetting();
+    auto defaultPBRMaterial = Create(defaultMaterialSetting, "Default PBR Material");
+    defaultPBRMaterial->mPipelineName = PipelineType::ForwardOpaquePBR;
+    defaultPBRMaterial->mPipeline = mPipelineManager->Get(defaultPBRMaterial->mPipelineName);
+    defaultPBRMaterial->mTextures.AlbedoID = mTextureManager->GetDefaultTexture(DefaultTextureType::Albedo)->GetID();
+    defaultPBRMaterial->mTextures.NormalID = mTextureManager->GetDefaultTexture(DefaultTextureType::Normal)->GetID();
+    defaultPBRMaterial->mTextures.EmissiveID =
+        mTextureManager->GetDefaultTexture(DefaultTextureType::Emissive)->GetID();
+    defaultPBRMaterial->mTextures.ARMID = mTextureManager->GetDefaultTexture(DefaultTextureType::ARM)->GetID();
+    defaultPBRMaterial->mTextures.Albedo = mTextureManager->Get(defaultPBRMaterial->mTextures.AlbedoID);
+    defaultPBRMaterial->mTextures.Normal = mTextureManager->Get(defaultPBRMaterial->mTextures.NormalID);
+    defaultPBRMaterial->mTextures.ARM = mTextureManager->Get(defaultPBRMaterial->mTextures.ARMID);
+    defaultPBRMaterial->mTextures.Emissive = mTextureManager->Get(defaultPBRMaterial->mTextures.EmissiveID);
+    CreateVulkanResources(defaultPBRMaterial);
+    Write(defaultPBRMaterial);
+    return defaultPBRMaterial;
 }
 } // namespace MEngine::Core::Manager

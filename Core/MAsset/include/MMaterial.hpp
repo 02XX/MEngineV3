@@ -2,6 +2,7 @@
 
 #include "MAsset.hpp"
 #include "MPipeline.hpp"
+#include "MPipelineManager.hpp"
 #include <memory>
 #include <vulkan/vulkan_handles.hpp>
 
@@ -20,11 +21,15 @@ class MMaterialSetting : public MAssetSetting
 };
 class MMaterial : public MAsset
 {
+    friend class nlohmann::adl_serializer<MMaterial>;
+
   protected:
-    std::shared_ptr<MPipeline> mPipeline;
+    std::string mPipelineName = PipelineType::ForwardOpaquePBR;
     MMaterialSetting mSetting{};
     vk::UniqueDescriptorSet mMaterialDescriptorSet;
     MMaterialType mMaterialType = MMaterialType::Unknown;
+    // 导航属性
+    std::shared_ptr<MPipeline> mPipeline;
 
   public:
     MMaterial(const UUID &id, const std::string &name, const MMaterialSetting &setting)

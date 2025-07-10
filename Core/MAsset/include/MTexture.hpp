@@ -83,10 +83,11 @@ class MTexture final : public MAsset
             VkImage image = mImage;
             vmaDestroyImage(mVulkanContext->GetVmaAllocator(), image, mAllocation);
         }
-        if (mImageView)
-        {
-            ImGui_ImplVulkan_RemoveTexture(mThumbnailDescriptorSet);
-        }
+        // TODO: Remove ImGui texture Safely!!!!
+        //  if (mThumbnailDescriptorSet)
+        //  {
+        //      ImGui_ImplVulkan_RemoveTexture(mThumbnailDescriptorSet);
+        //  }
     }
     inline const vk::Image &GetImage() const
     {

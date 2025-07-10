@@ -95,6 +95,10 @@ void MEngineEditor::Init()
     lightComponent.LightType = LightType::Directional;
     lightTransform.name = "Directional Light";
     lightTransform.localRotation = glm::quat(glm::vec3(0.0, -glm::half_pi<float>(), 0.0f));
+
+    // bow
+    auto bowModel = mAssetDatabase->LoadFBX("Assets/BowArrow.fbx");
+    auto bowEntity = Function::Utils::EntityUtils::CreateEntity(registry, bowModel);
     LogInfo("MEngine Editor initialized successfully");
 }
 void MEngineEditor::InitWindow()
@@ -175,9 +179,6 @@ void MEngineEditor::InitImGui()
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // 启用键盘导航
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;     // 启用Docking
     // io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;   // 启用多视口支持
-    // 设置字体
-    // io.Fonts->AddFontFromFileTTF(mWindowConfig.fontPath.c_str(), mWindowConfig.fontSize);
-    io.FontDefault = io.Fonts->AddFontFromFileTTF("Assets/Fonts/NotoSans-Medium.ttf", 18.0f);
     ImGui::StyleColorsDark(); // 设置主题
 
     // 初始化ImGui的GLFW和Vulkan绑定
@@ -198,6 +199,17 @@ void MEngineEditor::InitImGui()
         LogError("Failed to initialize ImGui Vulkan backend");
         throw std::runtime_error("ImGui Vulkan init failed");
     }
+    // 设置字体
+    ImFontConfig fontConfig{};
+    auto notoSansFont = io.Fonts->AddFontFromFileTTF("Assets/Fonts/MSYH.TTC", 18.0f, &fontConfig,
+                                                     io.Fonts->GetGlyphRangesChineseFull());
+    if (!notoSansFont)
+    {
+        LogError("Failed to load NotoSans font");
+        throw std::runtime_error("NotoSans font load failed");
+    }
+    io.FontDefault = notoSansFont;
+    // ImGui_ImplVulkan_CreateFontsTexture();
     // 加载UI图标
     auto textureManager = injector.create<std::shared_ptr<IMTextureManager>>();
     auto loadIcon = [textureManager, this](const std::string &path, MAssetType type) {
@@ -208,6 +220,7 @@ void MEngineEditor::InitImGui()
         mAssetIconTextures[type] =
             textureManager->Create(textureSetting, "AssetIcon_" + std::string(magic_enum::enum_name(type)));
         auto [W, H, C, data] = Utils::ImageUtil::LoadImage(path);
+        textureManager->CreateVulkanResources(mAssetIconTextures[type]);
         textureManager->Write(
             mAssetIconTextures[type], data,
             TextureSize{static_cast<uint32_t>(W), static_cast<uint32_t>(H), static_cast<uint32_t>(C)});
@@ -864,7 +877,28 @@ void MEngineEditor::RenderHierarchyPanel()
             {
                 if (ImGui::MenuItem("Delete"))
                 {
-                    // mSelectedEntity = entt::null;
+                    auto vulkanContext = injector.create<std::shared_ptr<VulkanContext>>();
+                    vulkanContext->GetDevice().waitIdle();
+                    auto &transformComponent = registry->get<MTransformComponent>(mSelectedEntity);
+                    // 删除子节点
+                    for (auto child : transformComponent.children)
+                    {
+                        if (registry->valid(child))
+                        {
+                            registry->destroy(child);
+                        }
+                    }
+                    if (transformComponent.parent != entt::null)
+                    {
+                        auto &parentTransform = registry->get<MTransformComponent>(transformComponent.parent);
+                        parentTransform.children.erase(std::remove(parentTransform.children.begin(),
+                                                                   parentTransform.children.end(), mSelectedEntity),
+                                                       parentTransform.children.end());
+                    }
+                    // 删除当前节点
+                    registry->destroy(mSelectedEntity);
+                    mSelectedEntity = entt::null;
+                    mHoveredEntity = entt::null;
                 }
             }
             ImGui::EndPopup();

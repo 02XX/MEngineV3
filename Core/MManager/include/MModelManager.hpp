@@ -30,6 +30,10 @@ class MModelManager final : public MManager<MModel, MModelSetting>, public IMMod
     {
     }
     std::shared_ptr<MModel> CreateCube() override;
+    std::shared_ptr<MModel> CreateSphere() override;
+    std::shared_ptr<MModel> CreatePlane() override;
+    std::shared_ptr<MModel> CreateCylinder() override;
     void CreateDefault() override;
+    virtual void CreateVulkanResources(std::shared_ptr<MModel> asset) override;
 };
 } // namespace MEngine::Core::Manager

@@ -1,4 +1,5 @@
 #include "MRenderSystem.hpp"
+#include "IMTextureManager.hpp"
 #include "Logger.hpp"
 #include "MCameraComponent.hpp"
 #include "MMaterialComponent.hpp"
@@ -132,6 +133,7 @@ void MRenderSystem::Shutdown()
 void MRenderSystem::CreateRenderTarget()
 {
     mRenderTargets.resize(mFrameCount);
+    auto textureManager = mResourceManager->GetManager<MTexture, MTextureSetting, IMTextureManager>();
     for (uint32_t i = 0; i < mFrameCount; ++i)
     {
         auto colorTextureSetting = MTextureSetting{};
@@ -141,6 +143,7 @@ void MRenderSystem::CreateRenderTarget()
         colorTextureSetting.height = mRenderTargets[i].height;
         colorTextureSetting.isShaderResource = true;
         mRenderTargets[i].colorTexture = mResourceManager->CreateAsset<MTexture, MTextureSetting>(colorTextureSetting);
+        textureManager->CreateVulkanResources(mRenderTargets[i].colorTexture);
         auto depthStencilTextureSetting = MTextureSetting{};
         depthStencilTextureSetting.isRenderTarget = true;
         depthStencilTextureSetting.format = vk::Format::eD32SfloatS8Uint;
@@ -149,6 +152,7 @@ void MRenderSystem::CreateRenderTarget()
         depthStencilTextureSetting.isDepthStencil = true;
         mRenderTargets[i].depthStencilTexture =
             mResourceManager->CreateAsset<MTexture, MTextureSetting>(depthStencilTextureSetting);
+        textureManager->CreateVulkanResources(mRenderTargets[i].depthStencilTexture);
     }
 }
 void MRenderSystem::CreateFramebuffer()

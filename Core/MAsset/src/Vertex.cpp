@@ -1,6 +1,6 @@
 #include "Vertex.hpp"
 
-namespace MEngine
+namespace MEngine::Core::Asset
 {
 std::array<vk::VertexInputAttributeDescription, 3> Vertex::GetVertexInputAttributeDescription()
 {
@@ -24,4 +24,4 @@ vk::VertexInputBindingDescription Vertex::GetVertexInputBindingDescription()
     bindingDescription.setBinding(0).setStride(sizeof(Vertex)).setInputRate(vk::VertexInputRate::eVertex);
     return bindingDescription;
 }
-} // namespace MEngine
+} // namespace MEngine::Core::Asset

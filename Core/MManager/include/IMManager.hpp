@@ -24,6 +24,7 @@ class IMManager : public IMManagerBase
      * @return std::shared_ptr<MAsset>
      */
     virtual std::shared_ptr<TAsset> Create(const TSetting &setting, const std::string &name) = 0;
+    virtual void CreateVulkanResources(std::shared_ptr<TAsset> asset) = 0;
     virtual std::shared_ptr<TAsset> Get(const UUID &id) const = 0;
     virtual std::vector<std::shared_ptr<TAsset>> GetAll() const = 0;
     virtual void Update(std::shared_ptr<TAsset> asset) = 0;

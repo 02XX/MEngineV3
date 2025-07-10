@@ -2,6 +2,7 @@
 #include "Logger.hpp"
 #include "MAsset.hpp"
 #include "MFolder.hpp"
+#include "MTexture.hpp"
 #include "ResourceManager.hpp"
 #include "Serialize.hpp"
 #include "UUID.hpp"
@@ -97,6 +98,9 @@ class AssetDatabase
 
     std::shared_ptr<MFolder> LoadDatabase(const std::filesystem::path &directory,
                                           const std::filesystem::path &parentDirectory = {});
+    // External Assets
+    std::shared_ptr<MModel> LoadFBX(const std::filesystem::path &path);
+    std::shared_ptr<MTexture> LoadImage(const std::filesystem::path &path);
 };
 } // namespace Editor
 } // namespace MEngine

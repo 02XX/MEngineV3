@@ -14,11 +14,7 @@
 using namespace MEngine::Core::Asset;
 namespace MEngine::Core::Manager
 {
-struct PipelineType
-{
-    static const std::string ForwardOpaquePBR;
-    static const std::string ForwardTransparentPBR;
-};
+
 class MPipelineManager final : public MManager<MPipeline, MPipelineSetting>, public IMPipelineManager
 {
     using MManager<MPipeline, MPipelineSetting>::Get;
@@ -55,6 +51,7 @@ class MPipelineManager final : public MManager<MPipeline, MPipelineSetting>, pub
     void Remove(const UUID &id) override;
     void Remove(const std::string &name) override;
     void CreateDefault() override;
+    virtual void CreateVulkanResources(std::shared_ptr<MPipeline> asset) override;
     inline std::vector<vk::DescriptorSetLayoutBinding> GetGlobalDescriptorSetLayoutBindings() const override
     {
         return mGlobalDescriptorSetLayoutBindings;

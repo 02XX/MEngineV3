@@ -12,4 +12,7 @@ std::shared_ptr<MFolder> MFolderManager::Create(const MFolderSetting &setting, c
 void MFolderManager::CreateDefault()
 {
 }
+void MFolderManager::CreateVulkanResources(std::shared_ptr<MFolder> asset)
+{
+}
 } // namespace MEngine::Core::Manager

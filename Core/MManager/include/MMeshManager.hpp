@@ -4,6 +4,7 @@
 #include "RenderPassManager.hpp"
 #include <cstdint>
 #include <memory>
+#include <unordered_map>
 #include <vulkan/vulkan_handles.hpp>
 
 using namespace MEngine::Core::Asset;
@@ -17,6 +18,7 @@ class MMeshManager final : public MManager<MMesh, MMeshSetting>, public IMMeshMa
     vk::UniqueCommandBuffer mCommandBuffer;
     vk::UniqueFence mFence;
     void WriteBuffer(vk::Buffer buffer, void *data, uint32_t size);
+    std::unordered_map<DefaultMeshType, std::shared_ptr<MMesh>> mDefaultMeshes;
 
   public:
     MMeshManager(std::shared_ptr<VulkanContext> vulkanContext, std::shared_ptr<IUUIDGenerator> uuidGenerator);
@@ -28,5 +30,11 @@ class MMeshManager final : public MManager<MMesh, MMeshSetting>, public IMMeshMa
     void Write(std::shared_ptr<MMesh> mesh, const std::vector<Vertex> &vertices,
                const std::vector<uint32_t> &indices) override;
     void CreateDefault() override;
+    virtual void CreateVulkanResources(std::shared_ptr<MMesh> asset) override;
+    std::shared_ptr<MMesh> CreateCubeMesh() override;
+    std::shared_ptr<MMesh> CreateSphereMesh() override;
+    std::shared_ptr<MMesh> CreatePlaneMesh() override;
+    std::shared_ptr<MMesh> CreateCylinderMesh() override;
+    std::shared_ptr<MMesh> GetMesh(DefaultMeshType type) const override;
 };
 } // namespace MEngine::Core::Manager

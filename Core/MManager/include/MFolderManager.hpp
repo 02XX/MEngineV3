@@ -23,5 +23,6 @@ class MFolderManager final : public MManager<MFolder, MFolderSetting>, public IM
     {
     }
     void CreateDefault() override;
+    virtual void CreateVulkanResources(std::shared_ptr<MFolder> asset) override;
 };
 } // namespace MEngine::Core::Manager

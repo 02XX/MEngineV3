@@ -1,6 +1,7 @@
 #pragma once
 #include "IMManager.hpp"
 #include "MMaterial.hpp"
+#include <memory>
 using namespace MEngine::Core::Asset;
 namespace MEngine::Core::Manager
 {
@@ -10,5 +11,6 @@ class IMMaterialManager : public virtual IMManager<TAsset, TSetting>
   public:
     ~IMMaterialManager() override = default;
     virtual void Write(std::shared_ptr<TAsset> material) = 0;
+    virtual std::shared_ptr<TAsset> CreateDefaultMaterial() = 0;
 };
 } // namespace MEngine::Core::Manager

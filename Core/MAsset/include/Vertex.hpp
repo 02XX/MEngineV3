@@ -1,7 +1,7 @@
 #pragma once
 #include <glm/glm.hpp>
 #include <vulkan/vulkan.hpp>
-namespace MEngine
+namespace MEngine::Core::Asset
 {
 class Vertex
 {
@@ -12,4 +12,4 @@ class Vertex
     static std::array<vk::VertexInputAttributeDescription, 3> GetVertexInputAttributeDescription();
     static vk::VertexInputBindingDescription GetVertexInputBindingDescription();
 };
-} // namespace MEngine
+} // namespace MEngine::Core::Asset

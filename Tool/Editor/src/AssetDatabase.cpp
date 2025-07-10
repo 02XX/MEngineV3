@@ -3,12 +3,23 @@
 #include "MAsset.hpp"
 #include "MFolder.hpp"
 
+#include "MMesh.hpp"
+#include "MMeshManager.hpp"
+#include "MModel.hpp"
+#include "MPBRMaterial.hpp"
 #include "MPipeline.hpp"
 #include "MTexture.hpp"
 #include "Reflect.hpp"
+#include "Vertex.hpp"
+#include <MModel.hpp>
+#include <assimp/Importer.hpp>
+#include <assimp/postprocess.h>
+#include <assimp/scene.h>
 #include <filesystem>
+#include <functional>
 #include <memory>
 #include <string>
+#include <vector>
 
 namespace MEngine::Editor
 {
@@ -179,5 +190,105 @@ std::filesystem::path AssetDatabase::GenerateUniqueAssetPath(std::filesystem::pa
         ++counter;
     } while (std::filesystem::exists(newPath));
     return newPath;
+}
+std::shared_ptr<MModel> AssetDatabase::LoadFBX(const std::filesystem::path &path)
+{
+    Assimp::Importer importer;
+    auto scene = importer.ReadFile(path.string().c_str(), aiProcess_GenUVCoords | aiProcess_ForceGenNormals |
+                                                              aiProcess_Triangulate | aiProcess_CalcTangentSpace |
+                                                              aiProcess_FlipUVs);
+    if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode)
+    {
+        LogError("Failed to load FBX file {}: {}", path.string(), importer.GetErrorString());
+        throw std::runtime_error("Load fbx file failed.");
+    }
+    auto sceneName = scene->mRootNode->mName.C_Str();
+    auto meshManager = mResourceManager->GetManager<MMesh, MMeshSetting, IMMeshManager>();
+    auto materialManager = mResourceManager->GetManager<MPBRMaterial, MPBRMaterialSetting, IMPBRMaterialManager>();
+    auto model = mResourceManager->CreateAsset<MModel, MModelSetting>({});
+    std::vector<std::shared_ptr<MMesh>> modelMeshes{};
+    std::vector<std::shared_ptr<MMaterial>> modelMaterials{};
+    std::function<std::unique_ptr<Node>(const aiNode *, Node *parent)> processNode;
+    processNode = [&](const aiNode *node, Node *parent) {
+        auto modelNode = std::make_unique<Node>();
+        auto name = node->mName.C_Str();
+        auto transform = node->mTransformation;
+        modelNode->Name = name ? name : "Unnamed Node";
+        // modelNode->Transform =
+        //     glm::mat4(transform.a1, transform.b1, transform.c1, transform.d1, transform.a2, transform.b2,
+        //     transform.c2,
+        //               transform.d2, transform.a3, transform.b3, transform.c3, transform.d3, transform.a4,
+        //               transform.b4, transform.c4, transform.d4);
+        for (unsigned int i = 0; i < node->mNumMeshes; i++)
+        {
+            aiMesh *mesh = scene->mMeshes[node->mMeshes[i]];
+            std::vector<Vertex> vertices;
+            std::vector<uint32_t> indices;
+            for (unsigned int i = 0; i < mesh->mNumVertices; i++)
+            {
+                Vertex vertex{};
+                // Position
+                vertex.position.x = mesh->mVertices[i].x;
+                vertex.position.y = mesh->mVertices[i].y;
+                vertex.position.z = mesh->mVertices[i].z;
+
+                // Normal
+                if (mesh->HasNormals())
+                {
+                    vertex.normal.x = mesh->mNormals[i].x;
+                    vertex.normal.y = mesh->mNormals[i].y;
+                    vertex.normal.z = mesh->mNormals[i].z;
+                }
+
+                // TexCoord
+                if (mesh->mTextureCoords[0])
+                {
+                    vertex.texCoords.x = mesh->mTextureCoords[0][i].x;
+                    vertex.texCoords.y = mesh->mTextureCoords[0][i].y;
+                }
+                vertices.push_back(vertex);
+            }
+            for (unsigned int i = 0; i < mesh->mNumFaces; i++)
+            {
+                aiFace face = mesh->mFaces[i];
+                for (unsigned int j = 0; j < face.mNumIndices; j++)
+                {
+                    indices.push_back(face.mIndices[j]);
+                }
+            }
+            if (mesh->mMaterialIndex >= 0)
+            {
+                aiMaterial *material = scene->mMaterials[mesh->mMaterialIndex];
+            }
+            MMeshSetting meshSetting{};
+            meshSetting.vertexBufferSize = vertices.size() * sizeof(Vertex);
+            meshSetting.indexBufferSize = indices.size() * sizeof(uint32_t);
+            modelNode->MeshIndex = static_cast<int>(modelMeshes.size());
+            modelNode->MaterialIndex = static_cast<int>(modelMaterials.size());
+            modelNode->Parent = parent;
+            auto modelMesh = mResourceManager->CreateAsset<MMesh, MMeshSetting>(meshSetting);
+            modelMesh->SetVertices(vertices);
+            modelMesh->SetIndices(indices);
+            meshManager->CreateVulkanResources(modelMesh);
+            meshManager->Write(modelMesh, vertices, indices);
+            modelMeshes.push_back(modelMesh);
+            auto defaultMaterial = materialManager->CreateDefaultMaterial();
+            modelMaterials.push_back(defaultMaterial);
+        }
+        for (unsigned int i = 0; i < node->mNumChildren; i++)
+        {
+            auto child = processNode(node->mChildren[i], modelNode.get());
+            modelNode->Children.push_back(std::move(child));
+        }
+        return modelNode;
+    };
+    auto rootNoe = processNode(scene->mRootNode, nullptr);
+    model->SetNode(std::move(rootNoe));
+    model->SetMeshes(modelMeshes);
+    model->SetMaterials(modelMaterials);
+    return model;
+}
+std::shared_ptr<MTexture> AssetDatabase::LoadImage(const std::filesystem::path &path)
+{
 }
 } // namespace MEngine::Editor

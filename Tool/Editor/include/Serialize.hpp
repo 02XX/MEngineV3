@@ -1,12 +1,19 @@
 #pragma once
 #include "MAsset.hpp"
 
+#include "MMaterial.hpp"
+#include "MMesh.hpp"
+#include "MModel.hpp"
+#include "MPBRMaterial.hpp"
 #include "MPipeline.hpp"
 
 #include "MTexture.hpp"
 
 #include "UUID.hpp"
+#include "Vertex.hpp"
+#include <glm/ext/matrix_float4x4.hpp>
 #include <magic_enum/magic_enum.hpp>
+#include <memory>
 #include <nlohmann/json.hpp>
 
 using json = nlohmann::json;
@@ -23,6 +30,61 @@ template <> struct adl_serializer<UUID>
     static void from_json(const json &j, UUID &p)
     {
         p = UUID(j.get<std::string>());
+    }
+};
+template <> struct adl_serializer<glm::vec3>
+{
+    static void to_json(json &j, const glm::vec3 &vec)
+    {
+        j = {vec.x, vec.y, vec.z};
+    }
+    static void from_json(const json &j, glm::vec3 &vec)
+    {
+        vec.x = j.at(0).get<float>();
+        vec.y = j.at(1).get<float>();
+        vec.z = j.at(2).get<float>();
+    }
+};
+template <> struct adl_serializer<glm::vec2>
+{
+    static void to_json(json &j, const glm::vec2 &vec)
+    {
+        j = {vec.x, vec.y};
+    }
+    static void from_json(const json &j, glm::vec2 &vec)
+    {
+        vec.x = j.at(0).get<float>();
+        vec.y = j.at(1).get<float>();
+    }
+};
+template <> struct adl_serializer<Vertex>
+{
+    static void to_json(json &j, const Vertex &asset)
+    {
+        j["position"] = asset.position;
+        j["normal"] = asset.normal;
+        j["texCoords"] = asset.texCoords;
+    }
+    static void from_json(const json &j, Vertex &asset)
+    {
+        asset.position = j["position"].get<glm::vec3>();
+        asset.normal = j["normal"].get<glm::vec3>();
+        asset.texCoords = j["texCoords"].get<glm::vec2>();
+    }
+};
+template <> struct adl_serializer<glm::mat4>
+{
+    static void to_json(json &j, const glm::mat4 &mat)
+    {
+        j = {mat[0][0], mat[0][1], mat[0][2], mat[0][3], mat[1][0], mat[1][1], mat[1][2], mat[1][3],
+             mat[2][0], mat[2][1], mat[2][2], mat[2][3], mat[3][0], mat[3][1], mat[3][2], mat[3][3]};
+    }
+    static void from_json(const json &j, glm::mat4 &mat)
+    {
+        mat = glm::mat4(j.at(0).get<float>(), j.at(1).get<float>(), j.at(2).get<float>(), j.at(3).get<float>(),
+                        j.at(4).get<float>(), j.at(5).get<float>(), j.at(6).get<float>(), j.at(7).get<float>(),
+                        j.at(8).get<float>(), j.at(9).get<float>(), j.at(10).get<float>(), j.at(11).get<float>(),
+                        j.at(12).get<float>(), j.at(13).get<float>(), j.at(14).get<float>(), j.at(15).get<float>());
     }
 };
 // settings
@@ -205,6 +267,54 @@ template <> struct adl_serializer<MPipelineSetting>
         setting.LogicOp = magic_enum::enum_cast<vk::LogicOp>(logicOpStr).value_or(vk::LogicOp::eCopy);
     }
 };
+template <> struct adl_serializer<MMeshSetting>
+{
+    static void to_json(json &j, const MMeshSetting &setting)
+    {
+        j = static_cast<const MAssetSetting &>(setting);
+        j["vertexBufferSize"] = setting.vertexBufferSize;
+        j["indexBufferSize"] = setting.indexBufferSize;
+    }
+    static void from_json(const json &j, MMeshSetting &setting)
+    {
+        j.get_to<MAssetSetting>(setting);
+        setting.vertexBufferSize = j["vertexBufferSize"].get<uint32_t>();
+        setting.indexBufferSize = j["indexBufferSize"].get<uint32_t>();
+    }
+};
+template <> struct adl_serializer<MMaterialSetting>
+{
+    static void to_json(json &j, const MMaterialSetting &setting)
+    {
+        j = static_cast<const MAssetSetting &>(setting);
+    }
+    static void from_json(const json &j, MMaterialSetting &setting)
+    {
+        j.get_to<MAssetSetting>(setting);
+    }
+};
+template <> struct adl_serializer<MPBRMaterialSetting>
+{
+    static void to_json(json &j, const MPBRMaterialSetting &setting)
+    {
+        j = static_cast<const MMaterialSetting &>(setting);
+    }
+    static void from_json(const json &j, MPBRMaterialSetting &setting)
+    {
+        j.get_to<MMaterialSetting>(setting);
+    }
+};
+template <> struct adl_serializer<MModelSetting>
+{
+    static void to_json(json &j, const MModelSetting &setting)
+    {
+        j = static_cast<const MAssetSetting &>(setting);
+    }
+    static void from_json(const json &j, MModelSetting &setting)
+    {
+        j.get_to<MAssetSetting>(setting);
+    }
+};
 // MAsset
 template <> struct adl_serializer<MAsset>
 {
@@ -265,6 +375,143 @@ template <> struct adl_serializer<MPipeline>
     {
         j.get_to<MAsset>(pipeline);
         pipeline.mSetting = j["setting"].get<MPipelineSetting>();
+    }
+};
+
+template <> struct adl_serializer<MMesh>
+{
+    static void to_json(json &j, const MMesh &asset)
+    {
+        j = static_cast<const MAsset &>(asset);
+        j["vertices"] = asset.mVertices;
+        j["indices"] = asset.mIndices;
+    }
+    static void from_json(const json &j, MMesh &asset)
+    {
+        j.get_to<MAsset>(asset);
+        asset.mVertices = j["vertices"].get<std::vector<Vertex>>();
+        asset.mIndices = j["indices"].get<std::vector<uint32_t>>();
+    }
+};
+template <> struct adl_serializer<MMaterial>
+{
+    static void to_json(json &j, const MMaterial &asset)
+    {
+        j = static_cast<const MAsset &>(asset);
+        j["setting"] = asset.mSetting;
+        j["materialType"] = magic_enum::enum_name(asset.mMaterialType);
+        j["pipelineName"] = asset.mPipelineName;
+    }
+    static void from_json(const json &j, MMaterial &asset)
+    {
+        j.get_to<MAsset>(asset);
+        asset.mSetting = j["setting"].get<MMaterialSetting>();
+        auto materialTypeStr = j["materialType"].get<std::string>();
+        asset.mMaterialType = magic_enum::enum_cast<MMaterialType>(materialTypeStr).value_or(MMaterialType::Unknown);
+        asset.mPipelineName = j["pipelineName"].get<std::string>();
+    }
+};
+template <> struct adl_serializer<MPBRMaterialProperties>
+{
+    static void to_json(json &j, const MPBRMaterialProperties &asset)
+    {
+        j["Albedo"] = asset.Albedo;
+        j["Normal"] = asset.Normal;
+        j["Metallic"] = asset.Metallic;
+        j["Roughness"] = asset.Roughness;
+        j["AO"] = asset.AO;
+        j["EmissiveIntensity"] = asset.EmissiveIntensity;
+    }
+    static void from_json(const json &j, MPBRMaterialProperties &asset)
+    {
+        asset.Albedo = j["Albedo"].get<glm::vec3>();
+        asset.Normal = j["Normal"].get<glm::vec3>();
+        asset.Metallic = j["Metallic"].get<float>();
+        asset.Roughness = j["Roughness"].get<float>();
+        asset.AO = j["AO"].get<float>();
+        asset.EmissiveIntensity = j["EmissiveIntensity"].get<float>();
+    }
+};
+template <> struct adl_serializer<MPBRTextures>
+{
+    static void to_json(json &j, const MPBRTextures &asset)
+    {
+        j["AlbedoID"] = asset.AlbedoID;
+        j["NormalID"] = asset.NormalID;
+        j["ARMID"] = asset.ARMID;
+        j["EmissiveID"] = asset.EmissiveID;
+    }
+    static void from_json(const json &j, MPBRTextures &asset)
+    {
+        asset.AlbedoID = j["AlbedoID"].get<UUID>();
+        asset.NormalID = j["NormalID"].get<UUID>();
+        asset.ARMID = j["ARMID"].get<UUID>();
+        asset.EmissiveID = j["EmissiveID"].get<UUID>();
+    }
+};
+template <> struct adl_serializer<MPBRMaterial>
+{
+    static void to_json(json &j, const MPBRMaterial &asset)
+    {
+        j = static_cast<const MMaterial &>(asset);
+        j["pbrSetting"] = asset.mSetting;
+        j["properties"] = asset.mProperties;
+        j["textures"] = asset.mTextures;
+    }
+    static void from_json(const json &j, MPBRMaterial &asset)
+    {
+        j.get_to<MMaterial>(asset);
+        asset.mSetting = j["pbrSetting"].get<MPBRMaterialSetting>();
+        asset.mProperties = j["properties"].get<MPBRMaterialProperties>();
+        asset.mTextures = j["textures"].get<MPBRTextures>();
+    }
+};
+template <> struct adl_serializer<Node>
+{
+    static void to_json(json &j, const Node &node)
+    {
+        j["name"] = node.Name;
+        j["transform"] = node.Transform;
+        j["children"] = json::array();
+        for (const auto &child : node.Children)
+        {
+            json childJson;
+            to_json(childJson, *child);
+            j["children"].push_back(childJson);
+        }
+    }
+    static void from_json(const json &j, Node &node)
+    {
+        j.at("name").get_to(node.Name);
+        j.at("transform").get_to(node.Transform);
+        for (const auto &childJson : j.at("children"))
+        {
+            auto child = std::make_unique<Node>();
+            from_json(childJson, *child);
+            node.Children.push_back(std::move(child));
+        }
+    }
+};
+template <> struct adl_serializer<MModel>
+{
+    static void to_json(json &j, const MModel &asset)
+    {
+        j = static_cast<const MAsset &>(asset);
+        j["meshes"] = json::array();
+        for (const auto &mesh : asset.mMeshes)
+        {
+            j["meshes"].push_back(*mesh);
+        }
+        j["materials"] = json::array();
+        for (const auto &material : asset.mMaterials)
+        {
+            j["materials"].push_back(*material);
+        }
+        j["rootNode"] = *asset.mRootNode;
+    }
+    static void from_json(const json &j, MModel &asset)
+    {
+        j.get_to<MAsset>(asset);
     }
 };
 } // namespace nlohmann

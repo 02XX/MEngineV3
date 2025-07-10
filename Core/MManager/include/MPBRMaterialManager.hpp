@@ -23,5 +23,7 @@ class MPBRMaterialManager final : public MMaterialManager<MPBRMaterial, MPBRMate
     }
     void Write(std::shared_ptr<MPBRMaterial> material) override;
     void CreateDefault() override;
+    std::shared_ptr<MPBRMaterial> CreateDefaultMaterial() override;
+    virtual void CreateVulkanResources(std::shared_ptr<MPBRMaterial> asset) override;
 };
 } // namespace MEngine::Core::Manager

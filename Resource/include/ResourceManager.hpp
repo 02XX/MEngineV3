@@ -74,12 +74,13 @@ class ResourceManager final
         mManagers[typeIndex] = manager;
         LogInfo("Registered manager for type: {}", typeIndex.name());
     }
-    template <std::derived_from<MAsset> TAsset> std::shared_ptr<IMManager<TAsset, MAssetSetting>> GetManager() const
+    template <std::derived_from<MAsset> TAsset, std::derived_from<MAssetSetting> TSetting,
+              std::derived_from<IMManager<TAsset, TSetting>> TManager>
+    std::shared_ptr<TManager> GetManager() const
     {
         if (mManagers.contains(std::type_index(typeid(TAsset))))
         {
-            return std::static_pointer_cast<IMManager<TAsset, MAssetSetting>>(
-                mManagers.at(std::type_index(typeid(TAsset))));
+            return std::dynamic_pointer_cast<TManager>(mManagers.at(std::type_index(typeid(TAsset))));
         }
         return nullptr;
     }

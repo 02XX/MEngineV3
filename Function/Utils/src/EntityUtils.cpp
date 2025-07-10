@@ -15,16 +15,19 @@ entt::entity EntityUtils::CreateEntity(std::shared_ptr<entt::registry> registry,
         entt::entity entity = registry->create();
         auto &transformComponent = registry->emplace<MTransformComponent>(entity, MTransformComponent{});
         transformComponent.name = currentNode->Name;
-        auto &meshComponent = registry->emplace<MMeshComponent>(entity, MMeshComponent{});
-        meshComponent.meshID = meshes[currentNode->MeshIndex]->GetID();
-        meshComponent.mesh = meshes[currentNode->MeshIndex];
-  
-        auto &materialComponent = registry->emplace<MMaterialComponent>(entity, MMaterialComponent{});
-        materialComponent.materialID = materials[currentNode->MaterialIndex]->GetID();
-        materialComponent.material = materials[currentNode->MaterialIndex];
-        for (auto child : currentNode->Children)
+        if (currentNode->MeshIndex != -1 && currentNode->MaterialIndex != -1)
         {
-            auto childEntity = createNode(child);
+            auto &meshComponent = registry->emplace<MMeshComponent>(entity, MMeshComponent{});
+            meshComponent.meshID = meshes[currentNode->MeshIndex]->GetID();
+            meshComponent.mesh = meshes[currentNode->MeshIndex];
+
+            auto &materialComponent = registry->emplace<MMaterialComponent>(entity, MMaterialComponent{});
+            materialComponent.materialID = materials[currentNode->MaterialIndex]->GetID();
+            materialComponent.material = materials[currentNode->MaterialIndex];
+        }
+        for (auto &child : currentNode->Children)
+        {
+            auto childEntity = createNode(child.get());
             auto &childTransformComponent = registry->get<MTransformComponent>(childEntity);
             childTransformComponent.parent = entity;
             transformComponent.children.push_back(childEntity);

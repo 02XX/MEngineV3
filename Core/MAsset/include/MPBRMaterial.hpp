@@ -14,6 +14,11 @@ class MPBRMaterialSetting final : public MMaterialSetting
 };
 struct MPBRTextures
 {
+    UUID AlbedoID{};
+    UUID NormalID{};
+    UUID ARMID{}; // Ambient Occlusion, Roughness, Metallic
+    UUID EmissiveID{};
+    // 导航属性
     std::shared_ptr<MTexture> Albedo{};
     std::shared_ptr<MTexture> Normal{};
     std::shared_ptr<MTexture> ARM{};

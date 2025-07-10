@@ -12,6 +12,15 @@ struct TextureSize
     uint32_t height;
     uint32_t channels;
 };
+enum class DefaultTextureType
+{
+    White,
+    Black,
+    Normal,
+    Emissive,
+    Albedo,
+    ARM
+};
 class IMTextureManager : public virtual IMManager<MTexture, MTextureSetting>
 {
   public:
@@ -32,5 +41,12 @@ class IMTextureManager : public virtual IMManager<MTexture, MTextureSetting>
      */
     virtual void Write(std::shared_ptr<MTexture> texture, const std::vector<uint8_t> &data,
                        const TextureSize &size) = 0;
+    virtual std::shared_ptr<MTexture> CreateWhiteTexture() = 0;
+    virtual std::shared_ptr<MTexture> CreateBlackTexture() = 0;
+    virtual std::shared_ptr<MTexture> CreateNormalTexture() = 0;
+    virtual std::shared_ptr<MTexture> CreateEmissiveTexture() = 0;
+    virtual std::shared_ptr<MTexture> CreateAlbedoTexture() = 0;
+    virtual std::shared_ptr<MTexture> CreateARMTexture() = 0;
+    virtual std::shared_ptr<MTexture> GetDefaultTexture(DefaultTextureType type) const = 0;
 };
 } // namespace MEngine::Core::Manager

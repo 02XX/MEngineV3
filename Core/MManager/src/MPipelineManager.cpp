@@ -11,8 +11,6 @@
 
 namespace MEngine::Core::Manager
 {
-const std::string PipelineType::ForwardOpaquePBR = "ForwardOpaquePBR";
-const std::string PipelineType::ForwardTransparentPBR = "ForwardTransparentPBR";
 
 MPipelineManager::MPipelineManager(std::shared_ptr<VulkanContext> vulkanContext,
                                    std::shared_ptr<IUUIDGenerator> uuidGenerator,
@@ -35,16 +33,24 @@ MPipelineManager::MPipelineManager(std::shared_ptr<VulkanContext> vulkanContext,
 std::shared_ptr<MPipeline> MPipelineManager::Create(const MPipelineSetting &setting, const std::string &name)
 {
     auto pipeline = std::make_shared<MPipeline>(mUUIDGenerator->Create(), name, mVulkanContext, setting);
+    mAssets[pipeline->GetID()] = pipeline;
+    mPipelines[pipeline->GetName()] = pipeline;
+    mMaterialDescriptorSetLayouts[pipeline->GetName()] = pipeline->mMaterialDescriptorSetLayouts.get();
+    LogDebug("Create pipeline: {}", pipeline->GetName());
+    return pipeline;
+}
+void MPipelineManager::CreateVulkanResources(std::shared_ptr<MPipeline> pipeline)
+{
     // 创建着色器模块
     // vertex shader
-    pipeline->mVertexShaderModule = CreateShaderModule(setting.VertexShaderPath);
+    pipeline->mVertexShaderModule = CreateShaderModule(pipeline->GetSetting().VertexShaderPath);
     // fragment shader
-    pipeline->mFragmentShaderModule = CreateShaderModule(setting.FragmentShaderPath);
-    LogDebug("Shader modules created successfully: {} and {}", setting.VertexShaderPath.string(),
-             setting.FragmentShaderPath.string());
+    pipeline->mFragmentShaderModule = CreateShaderModule(pipeline->mSetting.FragmentShaderPath);
+    LogDebug("Shader modules created successfully: {} and {}", pipeline->mSetting.VertexShaderPath.string(),
+             pipeline->mSetting.FragmentShaderPath.string());
     // 创建pipeline layout
     vk::DescriptorSetLayoutCreateInfo materialDescriptorSetLayoutCreateInfo;
-    materialDescriptorSetLayoutCreateInfo.setBindings(setting.MaterialDescriptorSetLayoutBindings)
+    materialDescriptorSetLayoutCreateInfo.setBindings(pipeline->mSetting.MaterialDescriptorSetLayoutBindings)
         .setFlags(vk::DescriptorSetLayoutCreateFlagBits::eUpdateAfterBindPool);
     auto materialDescriptorSetLayout =
         mVulkanContext->GetDevice().createDescriptorSetLayoutUnique(materialDescriptorSetLayoutCreateInfo);
@@ -100,38 +106,38 @@ std::shared_ptr<MPipeline> MPipelineManager::Create(const MPipelineSetting &sett
     viewportInfo.setViewports(viewport).setScissors(scissor);
     // ========== 5. 光栅化状态 ==========
     vk::PipelineRasterizationStateCreateInfo rasterizationInfo{};
-    rasterizationInfo.setDepthClampEnable(setting.DepthClampEnable)
-        .setRasterizerDiscardEnable(setting.RasterizerDiscardEnable)
-        .setPolygonMode(setting.PolygonMode)
-        .setLineWidth(setting.LineWidth)
-        .setCullMode(setting.CullMode)
-        .setFrontFace(setting.FrontFace)
-        .setDepthBiasEnable(setting.DepthBiasEnable);
+    rasterizationInfo.setDepthClampEnable(pipeline->mSetting.DepthClampEnable)
+        .setRasterizerDiscardEnable(pipeline->mSetting.RasterizerDiscardEnable)
+        .setPolygonMode(pipeline->mSetting.PolygonMode)
+        .setLineWidth(pipeline->mSetting.LineWidth)
+        .setCullMode(pipeline->mSetting.CullMode)
+        .setFrontFace(pipeline->mSetting.FrontFace)
+        .setDepthBiasEnable(pipeline->mSetting.DepthBiasEnable);
     // ========= 6. 多重采样 ==========
     vk::PipelineMultisampleStateCreateInfo multisampleInfo{};
-    multisampleInfo.setSampleShadingEnable(setting.MultisamplingEnable)
-        .setRasterizationSamples(setting.SampleCount)
-        .setMinSampleShading(setting.MinSampleShading)
+    multisampleInfo.setSampleShadingEnable(pipeline->mSetting.MultisamplingEnable)
+        .setRasterizationSamples(pipeline->mSetting.SampleCount)
+        .setMinSampleShading(pipeline->mSetting.MinSampleShading)
         .setPSampleMask(nullptr)
-        .setAlphaToCoverageEnable(setting.AlphaToCoverageEnable)
-        .setAlphaToOneEnable(setting.AlphaToOneEnable);
+        .setAlphaToCoverageEnable(pipeline->mSetting.AlphaToCoverageEnable)
+        .setAlphaToOneEnable(pipeline->mSetting.AlphaToOneEnable);
     // ========== 7. 深度模板测试 ==========
     vk::PipelineDepthStencilStateCreateInfo depthStencilInfo{};
-    depthStencilInfo.setDepthTestEnable(setting.DepthTestEnable)
-        .setDepthWriteEnable(setting.DepthWriteEnable)
-        .setDepthCompareOp(setting.DepthCompareOp)
-        .setDepthBoundsTestEnable(setting.DepthBoundsTestEnable)
-        .setMinDepthBounds(setting.MinDepthBounds)
-        .setMaxDepthBounds(setting.MaxDepthBounds)
-        .setStencilTestEnable(setting.StencilTestEnable);
+    depthStencilInfo.setDepthTestEnable(pipeline->mSetting.DepthTestEnable)
+        .setDepthWriteEnable(pipeline->mSetting.DepthWriteEnable)
+        .setDepthCompareOp(pipeline->mSetting.DepthCompareOp)
+        .setDepthBoundsTestEnable(pipeline->mSetting.DepthBoundsTestEnable)
+        .setMinDepthBounds(pipeline->mSetting.MinDepthBounds)
+        .setMaxDepthBounds(pipeline->mSetting.MaxDepthBounds)
+        .setStencilTestEnable(pipeline->mSetting.StencilTestEnable);
     // ========== 8. 颜色混合状态 ==========
     vk::PipelineColorBlendAttachmentState colorBlendAttachment{};
-    colorBlendAttachment.setBlendEnable(setting.ColorBlendingEnable)
+    colorBlendAttachment.setBlendEnable(pipeline->mSetting.ColorBlendingEnable)
         .setColorWriteMask(vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
                            vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA);
     vk::PipelineColorBlendStateCreateInfo colorBlendInfo{};
-    colorBlendInfo.setLogicOpEnable(setting.LogicOpEnable)
-        .setLogicOp(setting.LogicOp)
+    colorBlendInfo.setLogicOpEnable(pipeline->mSetting.LogicOpEnable)
+        .setLogicOp(pipeline->mSetting.LogicOp)
         .setAttachments(colorBlendAttachment)
         .setBlendConstants({0.0f, 0.0f, 0.0f, 0.0f});
     // ========== 9. 动态状态 ==========
@@ -140,7 +146,7 @@ std::shared_ptr<MPipeline> MPipelineManager::Create(const MPipelineSetting &sett
     dynamicStateInfo.setDynamicStates(dynamicStates);
     // ========== 10. 管线布局 ==========
     // ========== 11. 渲染通道 ==========
-    auto renderPass = mRenderPassManager->GetRenderPass(setting.RenderPassType);
+    auto renderPass = mRenderPassManager->GetRenderPass(pipeline->mSetting.RenderPassType);
     // ========== 12. 管线创建 ==========
     vk::GraphicsPipelineCreateInfo pipelineInfo{};
     pipelineInfo.setStageCount(static_cast<uint32_t>(shaderStages.size()))
@@ -163,11 +169,6 @@ std::shared_ptr<MPipeline> MPipelineManager::Create(const MPipelineSetting &sett
         LogError("Failed to create Forward Forward Opaque PBR pipeline");
     }
     pipeline->mPipeline = std::move(pipelineResult.value);
-    mAssets[pipeline->GetID()] = pipeline;
-    mPipelines[pipeline->GetName()] = pipeline;
-    mMaterialDescriptorSetLayouts[pipeline->GetName()] = pipeline->mMaterialDescriptorSetLayouts.get();
-    LogDebug("Create pipeline: {}", pipeline->GetName());
-    return pipeline;
 }
 vk::UniqueShaderModule MPipelineManager::CreateShaderModule(const std::filesystem::path &shaderPath) const
 
@@ -237,7 +238,6 @@ void MPipelineManager::Remove(const UUID &id)
 void MPipelineManager::CreateDefault()
 {
     // ForwardOpaquePBR
-
     std::vector<vk::DescriptorSetLayoutBinding> mDescriptorSetLayoutBindings{
 
         vk::DescriptorSetLayoutBinding{0, vk::DescriptorType::eUniformBuffer, 1,
@@ -260,6 +260,7 @@ void MPipelineManager::CreateDefault()
     pbrSetting.RenderPassType = RenderPassType::ForwardComposition;
     pbrSetting.MaterialDescriptorSetLayoutBindings = mDescriptorSetLayoutBindings;
     auto pbrPipeline = Create(pbrSetting, PipelineType::ForwardOpaquePBR);
+    CreateVulkanResources(pbrPipeline);
 }
 
 } // namespace MEngine::Core::Manager

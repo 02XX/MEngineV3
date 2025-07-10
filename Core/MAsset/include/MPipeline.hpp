@@ -17,6 +17,11 @@
 
 namespace MEngine::Core::Asset
 {
+struct PipelineType
+{
+    static constexpr const char *ForwardOpaquePBR = "ForwardOpaquePBR";
+    static constexpr const char *ForwardTransparentPBR = "ForwardTransparentPBR";
+};
 enum class RenderPassType
 {
     ShadowDepth,         // 生成所有光源的阴影贴图subpass0: 生成阴影贴图
