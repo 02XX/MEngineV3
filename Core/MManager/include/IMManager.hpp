@@ -13,17 +13,10 @@ class IMManagerBase
   public:
     virtual ~IMManagerBase() = default;
 };
-template <std::derived_from<MAsset> TAsset, std::derived_from<MAssetSetting> TSetting>
-class IMManager : public IMManagerBase
+template <std::derived_from<MAsset> TAsset> class IMManager : public IMManagerBase
 {
   public:
     ~IMManager() override = default;
-    /**
-     * @brief 根据设置创建资产
-     *
-     * @return std::shared_ptr<MAsset>
-     */
-    virtual std::shared_ptr<TAsset> Create(const TSetting &setting, const std::string &name) = 0;
     virtual void CreateVulkanResources(std::shared_ptr<TAsset> asset) = 0;
     virtual std::shared_ptr<TAsset> Get(const UUID &id) const = 0;
     virtual std::vector<std::shared_ptr<TAsset>> GetAll() const = 0;

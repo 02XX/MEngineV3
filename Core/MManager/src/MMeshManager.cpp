@@ -1,4 +1,5 @@
 #include "MMeshManager.hpp"
+#include "IMMeshManager.hpp"
 #include "Logger.hpp"
 #include "VMA.hpp"
 #include <cstring>
@@ -30,9 +31,11 @@ MMeshManager::MMeshManager(std::shared_ptr<VulkanContext> vulkanContext, std::sh
     }
     CreateDefault();
 }
-std::shared_ptr<MMesh> MMeshManager::Create(const MMeshSetting &setting, const std::string &name)
+std::shared_ptr<MMesh> MMeshManager::Create(const std::string &name, const std::vector<Vertex> &vertices,
+                                            const std::vector<uint32_t> &indices, const MMeshSetting &setting)
 {
-    std::shared_ptr<MMesh> mesh = std::make_shared<MMesh>(mUUIDGenerator->Create(), name, mVulkanContext, setting);
+    std::shared_ptr<MMesh> mesh =
+        std::make_shared<MMesh>(mUUIDGenerator->Create(), name, mVulkanContext, vertices, indices, setting);
     mAssets[mesh->GetID()] = mesh;
     return mesh;
 }
@@ -72,6 +75,10 @@ void MMeshManager::CreateVulkanResources(std::shared_ptr<MMesh> mesh)
         LogError("Failed to create index buffer for mesh");
         throw std::runtime_error("Failed to create index buffer for mesh");
     }
+}
+void MMeshManager::Update(std::shared_ptr<MMesh> mesh)
+{
+    mAssets[mesh->GetID()] = mesh;
 }
 void MMeshManager::WriteBuffer(vk::Buffer buffer, void *data, uint32_t size)
 {
@@ -115,19 +122,21 @@ void MMeshManager::WriteBuffer(vk::Buffer buffer, void *data, uint32_t size)
     // 清理临时资源
     vmaDestroyBuffer(mVulkanContext->GetVmaAllocator(), stagingBuffer, stagingAllocation);
 }
-void MMeshManager::Write(std::shared_ptr<MMesh> mesh, const std::vector<Vertex> &vertices,
-                         const std::vector<uint32_t> &indices)
+void MMeshManager::Write(std::shared_ptr<MMesh> mesh)
 {
     // vertex Staging buffer
-    WriteBuffer(mesh->GetVertexBuffer(), const_cast<Vertex *>(vertices.data()),
-                static_cast<uint32_t>(vertices.size() * sizeof(Vertex)));
+    WriteBuffer(mesh->GetVertexBuffer(), const_cast<Vertex *>(mesh->mVertices.data()),
+                static_cast<uint32_t>(mesh->mVertices.size() * sizeof(Vertex)));
     // index Staging buffer
-    WriteBuffer(mesh->GetIndexBuffer(), const_cast<uint32_t *>(indices.data()),
-                static_cast<uint32_t>(indices.size() * sizeof(uint32_t)));
+    WriteBuffer(mesh->GetIndexBuffer(), const_cast<uint32_t *>(mesh->mIndices.data()),
+                static_cast<uint32_t>(mesh->mIndices.size() * sizeof(uint32_t)));
 }
 void MMeshManager::CreateDefault()
 {
-    mDefaultMeshes[DefaultMeshType::Cube] = CreateCubeMesh();
+    auto cubeMesh = CreateCubeMesh();
+    Remove(cubeMesh->mID);
+    cubeMesh->mID = mDefaultMeshes[DefaultMeshType::Cube];
+    mAssets[mDefaultMeshes[DefaultMeshType::Cube]] = cubeMesh;
 }
 std::shared_ptr<MMesh> MMeshManager::CreateCubeMesh()
 {
@@ -186,13 +195,9 @@ std::shared_ptr<MMesh> MMeshManager::CreateCubeMesh()
                                            // 底面
                                            20, 21, 22, 20, 22, 23};
     auto meshSetting = MMeshSetting{};
-    meshSetting.vertexBufferSize = vertices.size() * sizeof(Vertex);
-    meshSetting.indexBufferSize = indices.size() * sizeof(uint32_t);
-    auto mesh = Create(meshSetting, "Cube Mesh");
-    mesh->SetVertices(vertices);
-    mesh->SetIndices(indices);
+    auto mesh = Create("Cube Mesh", vertices, indices, meshSetting);
     CreateVulkanResources(mesh);
-    Write(mesh, vertices, indices);
+    Write(mesh);
     return mesh;
 }
 std::shared_ptr<MMesh> MMeshManager::CreateSphereMesh()
@@ -208,7 +213,7 @@ std::shared_ptr<MMesh> MMeshManager::GetMesh(DefaultMeshType type) const
 {
     if (mDefaultMeshes.find(type) != mDefaultMeshes.end())
     {
-        return mDefaultMeshes.at(type);
+        return Get(mDefaultMeshes.at(type));
     }
     LogError("Default mesh type {} not found", static_cast<int>(type));
     return nullptr;

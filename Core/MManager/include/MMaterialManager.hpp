@@ -8,8 +8,8 @@
 
 namespace MEngine::Core::Manager
 {
-template <std::derived_from<MMaterial> TAsset, std::derived_from<MMaterialSetting> TSetting>
-class MMaterialManager : public MManager<TAsset, TSetting>, public virtual IMMaterialManager<TAsset, TSetting>
+template <std::derived_from<MMaterial> TAsset>
+class MMaterialManager : public MManager<TAsset>, public virtual IMMaterialManager<TAsset>
 {
   protected:
     std::shared_ptr<IMPipelineManager> mPipelineManager;
@@ -19,7 +19,7 @@ class MMaterialManager : public MManager<TAsset, TSetting>, public virtual IMMat
     MMaterialManager(std::shared_ptr<VulkanContext> vulkanContext, std::shared_ptr<IUUIDGenerator> uuidGenerator,
                      std::shared_ptr<IMPipelineManager> pipelineManager,
                      std::shared_ptr<IMTextureManager> textureManager)
-        : MManager<TAsset, TSetting>(vulkanContext, uuidGenerator), mPipelineManager(pipelineManager),
+        : MManager<TAsset>(vulkanContext, uuidGenerator), mPipelineManager(pipelineManager),
           mTextureManager(textureManager)
     {
     }

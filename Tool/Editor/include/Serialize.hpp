@@ -11,10 +11,12 @@
 
 #include "UUID.hpp"
 #include "Vertex.hpp"
+#include <cstdint>
 #include <glm/ext/matrix_float4x4.hpp>
 #include <magic_enum/magic_enum.hpp>
 #include <memory>
 #include <nlohmann/json.hpp>
+#include <string>
 
 using json = nlohmann::json;
 using namespace MEngine::Core::Asset;
@@ -103,8 +105,6 @@ template <> struct adl_serializer<MTextureSetting>
     {
         j = static_cast<const MAssetSetting &>(setting);
         // 序列化基础属性
-        j["width"] = setting.width;
-        j["height"] = setting.height;
         j["mipmapLevels"] = setting.mipmapLevels;
         j["arrayLayers"] = setting.arrayLayers;
         j["sampleCount"] = magic_enum::enum_name(setting.sampleCount);
@@ -142,8 +142,6 @@ template <> struct adl_serializer<MTextureSetting>
     {
         j.get_to<MAssetSetting>(setting);
         // 反序列化基础属性
-        setting.width = j["width"].get<uint32_t>();
-        setting.height = j["height"].get<uint32_t>();
         setting.mipmapLevels = j["mipmapLevels"].get<uint32_t>();
         setting.arrayLayers = j["arrayLayers"].get<uint32_t>();
         auto sampleCountStr = j["sampleCount"].get<std::string>();
@@ -272,14 +270,10 @@ template <> struct adl_serializer<MMeshSetting>
     static void to_json(json &j, const MMeshSetting &setting)
     {
         j = static_cast<const MAssetSetting &>(setting);
-        j["vertexBufferSize"] = setting.vertexBufferSize;
-        j["indexBufferSize"] = setting.indexBufferSize;
     }
     static void from_json(const json &j, MMeshSetting &setting)
     {
         j.get_to<MAssetSetting>(setting);
-        setting.vertexBufferSize = j["vertexBufferSize"].get<uint32_t>();
-        setting.indexBufferSize = j["indexBufferSize"].get<uint32_t>();
     }
 };
 template <> struct adl_serializer<MMaterialSetting>
@@ -323,6 +317,7 @@ template <> struct adl_serializer<MAsset>
         j["id"] = p.GetID();
         j["type"] = magic_enum::enum_name(p.GetType());
         j["state"] = magic_enum::enum_name(p.GetState());
+        j["name"] = p.GetName();
     }
 
     static void from_json(const json &j, MAsset &p)
@@ -347,6 +342,7 @@ template <> struct adl_serializer<MAsset>
         {
             throw std::runtime_error("Unknown MAssetState: " + j["state"].get<std::string>());
         }
+        p.SetName(j["name"].get<std::string>());
     }
 };
 template <> struct adl_serializer<MTexture>
@@ -385,12 +381,14 @@ template <> struct adl_serializer<MMesh>
         j = static_cast<const MAsset &>(asset);
         j["vertices"] = asset.mVertices;
         j["indices"] = asset.mIndices;
+        j["setting"] = asset.mSetting;
     }
     static void from_json(const json &j, MMesh &asset)
     {
         j.get_to<MAsset>(asset);
         asset.mVertices = j["vertices"].get<std::vector<Vertex>>();
         asset.mIndices = j["indices"].get<std::vector<uint32_t>>();
+        asset.mSetting = j["setting"].get<MMeshSetting>();
     }
 };
 template <> struct adl_serializer<MMaterial>
@@ -454,14 +452,14 @@ template <> struct adl_serializer<MPBRMaterial>
     static void to_json(json &j, const MPBRMaterial &asset)
     {
         j = static_cast<const MMaterial &>(asset);
-        j["pbrSetting"] = asset.mSetting;
+        j["setting"] = asset.mSetting;
         j["properties"] = asset.mProperties;
         j["textures"] = asset.mTextures;
     }
     static void from_json(const json &j, MPBRMaterial &asset)
     {
         j.get_to<MMaterial>(asset);
-        asset.mSetting = j["pbrSetting"].get<MPBRMaterialSetting>();
+        asset.mSetting = j["setting"].get<MPBRMaterialSetting>();
         asset.mProperties = j["properties"].get<MPBRMaterialProperties>();
         asset.mTextures = j["textures"].get<MPBRTextures>();
     }
@@ -472,6 +470,8 @@ template <> struct adl_serializer<Node>
     {
         j["name"] = node.Name;
         j["transform"] = node.Transform;
+        j["MeshIndex"] = node.MeshIndex;
+        j["MaterialIndex"] = node.MaterialIndex;
         j["children"] = json::array();
         for (const auto &child : node.Children)
         {
@@ -482,8 +482,10 @@ template <> struct adl_serializer<Node>
     }
     static void from_json(const json &j, Node &node)
     {
-        j.at("name").get_to(node.Name);
-        j.at("transform").get_to(node.Transform);
+        node.Name = j["name"].get<std::string>();
+        node.Transform = j["transform"].get<glm::mat4>();
+        node.MeshIndex = j["MeshIndex"].get<uint32_t>();
+        node.MaterialIndex = j["MaterialIndex"].get<uint32_t>();
         for (const auto &childJson : j.at("children"))
         {
             auto child = std::make_unique<Node>();
@@ -497,6 +499,10 @@ template <> struct adl_serializer<MModel>
     static void to_json(json &j, const MModel &asset)
     {
         j = static_cast<const MAsset &>(asset);
+        j["setting"] = asset.mSetting;
+        j["meshIDs"] = asset.mMeshIDs;
+        j["materialIDs"] = asset.mMaterialIDs;
+        j["rootNode"] = *asset.mRootNode;
         j["meshes"] = json::array();
         for (const auto &mesh : asset.mMeshes)
         {
@@ -505,13 +511,26 @@ template <> struct adl_serializer<MModel>
         j["materials"] = json::array();
         for (const auto &material : asset.mMaterials)
         {
-            j["materials"].push_back(*material);
+            switch (material->GetMaterialType())
+            {
+            case MMaterialType::Unknown:
+            case MMaterialType::PBR: {
+                j["materials"].push_back(*std::dynamic_pointer_cast<MPBRMaterial>(material));
+            }
+            case MMaterialType::Unlit:
+            case MMaterialType::Custom:
+                break;
+            }
         }
-        j["rootNode"] = *asset.mRootNode;
     }
     static void from_json(const json &j, MModel &asset)
     {
         j.get_to<MAsset>(asset);
+        asset.mSetting = j["setting"].get<MModelSetting>();
+        asset.mMeshIDs = j["meshIDs"].get<std::vector<UUID>>();
+        asset.mMaterialIDs = j["materialIDs"].get<std::vector<UUID>>();
+        asset.mRootNode = std::make_unique<Node>();
+        j["rootNode"].get_to(*asset.mRootNode);
     }
 };
 } // namespace nlohmann

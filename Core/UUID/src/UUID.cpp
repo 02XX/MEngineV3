@@ -4,9 +4,8 @@
 
 namespace MEngine::Core
 {
-UUID::UUID(const char *str)
+UUID::UUID(const char *str) : UUID(std::string(str))
 {
-    UUID(std::string(str));
 }
 UUID::UUID(const std::string &str)
 {

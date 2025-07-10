@@ -47,6 +47,12 @@ static void RegisterAsset()
             .DisplayName = "Texture",
             .Editable = true,
             .Serializable = true,
+        })
+        .data<&MTexture::SetImGuiTextureID, &MTexture::GetImGuiTextureID>("ImGuiTextureID"_hs)
+        .custom<Info>(Info{
+            .DisplayName = "ImGui Texture ID",
+            .Editable = false,
+            .Serializable = true,
         });
     entt::meta_factory<MPipeline>()
         .base<MAsset>()

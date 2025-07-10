@@ -133,26 +133,13 @@ void MRenderSystem::Shutdown()
 void MRenderSystem::CreateRenderTarget()
 {
     mRenderTargets.resize(mFrameCount);
-    auto textureManager = mResourceManager->GetManager<MTexture, MTextureSetting, IMTextureManager>();
+    auto textureManager = mResourceManager->GetManager<MTexture, IMTextureManager>();
     for (uint32_t i = 0; i < mFrameCount; ++i)
     {
-        auto colorTextureSetting = MTextureSetting{};
-        colorTextureSetting.isRenderTarget = true;
-        colorTextureSetting.format = vk::Format::eR32G32B32A32Sfloat;
-        colorTextureSetting.width = mRenderTargets[i].width;
-        colorTextureSetting.height = mRenderTargets[i].height;
-        colorTextureSetting.isShaderResource = true;
-        mRenderTargets[i].colorTexture = mResourceManager->CreateAsset<MTexture, MTextureSetting>(colorTextureSetting);
-        textureManager->CreateVulkanResources(mRenderTargets[i].colorTexture);
-        auto depthStencilTextureSetting = MTextureSetting{};
-        depthStencilTextureSetting.isRenderTarget = true;
-        depthStencilTextureSetting.format = vk::Format::eD32SfloatS8Uint;
-        depthStencilTextureSetting.width = mRenderTargets[i].width;
-        depthStencilTextureSetting.height = mRenderTargets[i].height;
-        depthStencilTextureSetting.isDepthStencil = true;
+        mRenderTargets[i].colorTexture =
+            textureManager->CreateColorAttachment(mRenderTargets[i].width, mRenderTargets[i].height);
         mRenderTargets[i].depthStencilTexture =
-            mResourceManager->CreateAsset<MTexture, MTextureSetting>(depthStencilTextureSetting);
-        textureManager->CreateVulkanResources(mRenderTargets[i].depthStencilTexture);
+            textureManager->CreateDepthStencilAttachment(mRenderTargets[i].width, mRenderTargets[i].height);
     }
 }
 void MRenderSystem::CreateFramebuffer()

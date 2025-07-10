@@ -44,7 +44,7 @@ class MAsset
     MAssetType mType = MAssetType::Unknown;
 
   public:
-    MAsset(const UUID &id = UUID(), const std::string &name = "Unnamed") : mID(id), mName(name)
+    MAsset(const UUID &id, const std::string &name) : mID(id), mName(name)
     {
     }
     virtual ~MAsset() = default;

@@ -115,10 +115,6 @@ class MPipeline : public MAsset
     {
         return mSetting;
     }
-    inline void SetSetting(const MPipelineSetting &setting)
-    {
-        mSetting = setting;
-    }
     inline const vk::ShaderModule GetVertexShaderModule() const
     {
         return mVertexShaderModule.get();

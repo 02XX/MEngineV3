@@ -12,8 +12,7 @@
 using namespace MEngine::Core::Asset;
 namespace MEngine::Core::Manager
 {
-template <std::derived_from<MAsset> TAsset, std::derived_from<MAssetSetting> TSetting>
-class MManager : public virtual IMManager<TAsset, TSetting>
+template <std::derived_from<MAsset> TAsset> class MManager : public virtual IMManager<TAsset>
 {
   protected:
     // ID

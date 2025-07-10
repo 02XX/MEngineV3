@@ -15,10 +15,8 @@ using namespace MEngine::Core::Asset;
 namespace MEngine::Core::Manager
 {
 
-class MPipelineManager final : public MManager<MPipeline, MPipelineSetting>, public IMPipelineManager
+class MPipelineManager final : public MManager<MPipeline>, public IMPipelineManager
 {
-    using MManager<MPipeline, MPipelineSetting>::Get;
-    using MManager<MPipeline, MPipelineSetting>::Remove;
 
   private:
     std::shared_ptr<RenderPassManager> mRenderPassManager;
@@ -41,15 +39,12 @@ class MPipelineManager final : public MManager<MPipeline, MPipelineSetting>, pub
     MPipelineManager(std::shared_ptr<VulkanContext> vulkanContext, std::shared_ptr<IUUIDGenerator> uuidGenerator,
                      std::shared_ptr<RenderPassManager> renderPassManager);
     ~MPipelineManager() override = default;
-    std::shared_ptr<MPipeline> Create(const MPipelineSetting &setting,
-                                      const std::string &nam = "New Pipeline") override;
-    std::shared_ptr<MPipeline> Get(const std::string &name) const override;
-    void Update(std::shared_ptr<MPipeline> pipeline) override
-    {
-    }
+    std::shared_ptr<MPipeline> Create(const std::string &name, const MPipelineSetting &setting) override;
+    std::shared_ptr<MPipeline> GetByName(const std::string &name) const override;
+    void Update(std::shared_ptr<MPipeline> pipeline) override;
     vk::UniqueShaderModule CreateShaderModule(const std::filesystem::path &shaderPath) const override;
     void Remove(const UUID &id) override;
-    void Remove(const std::string &name) override;
+    void RemoveByName(const std::string &name) override;
     void CreateDefault() override;
     virtual void CreateVulkanResources(std::shared_ptr<MPipeline> asset) override;
     inline std::vector<vk::DescriptorSetLayoutBinding> GetGlobalDescriptorSetLayoutBindings() const override

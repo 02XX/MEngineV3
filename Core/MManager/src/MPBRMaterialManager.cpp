@@ -1,18 +1,32 @@
 #include "MPBRMaterialManager.hpp"
 #include "MPBRMaterial.hpp"
 #include "MPipeline.hpp"
-#include "MPipelineManager.hpp"
-#include "UUID.hpp"
 #include "VMA.hpp"
 #include <cstring>
 #include <memory>
 #include <vector>
 namespace MEngine::Core::Manager
 {
-std::shared_ptr<MPBRMaterial> MPBRMaterialManager::Create(const MPBRMaterialSetting &setting, const std::string &name)
+std::shared_ptr<MPBRMaterial> MPBRMaterialManager::Create(const std::string &name, const std::string &pipelineName,
+                                                          const MPBRMaterialProperties &properties,
+                                                          const MPBRTextures &textures,
+                                                          const MPBRMaterialSetting &setting)
 {
-    auto pbrMaterial = std::make_shared<MPBRMaterial>(mUUIDGenerator->Create(), name, mVulkanContext, setting);
+    auto pbrMaterial = std::make_shared<MPBRMaterial>(mUUIDGenerator->Create(), name, mVulkanContext, pipelineName,
+                                                      properties, textures, setting);
+    Update(pbrMaterial);
+    mAssets[pbrMaterial->mID] = pbrMaterial;
     return pbrMaterial;
+}
+void MPBRMaterialManager::Update(std::shared_ptr<MPBRMaterial> pbrMaterial)
+{
+    // 设置导航属性
+    pbrMaterial->mPipeline = mPipelineManager->GetByName(pbrMaterial->mPipelineName);
+    pbrMaterial->mTextures.Albedo = mTextureManager->Get(pbrMaterial->mTextures.AlbedoID);
+    pbrMaterial->mTextures.Normal = mTextureManager->Get(pbrMaterial->mTextures.NormalID);
+    pbrMaterial->mTextures.ARM = mTextureManager->Get(pbrMaterial->mTextures.ARMID);
+    pbrMaterial->mTextures.Emissive = mTextureManager->Get(pbrMaterial->mTextures.EmissiveID);
+    mAssets[pbrMaterial->GetID()] = pbrMaterial;
 }
 void MPBRMaterialManager::CreateVulkanResources(std::shared_ptr<MPBRMaterial> pbrMaterial)
 {
@@ -44,10 +58,6 @@ void MPBRMaterialManager::CreateVulkanResources(std::shared_ptr<MPBRMaterial> pb
 }
 void MPBRMaterialManager::Write(std::shared_ptr<MPBRMaterial> material)
 {
-    material->mTextures.Albedo = mTextureManager->Get(material->mTextures.AlbedoID);
-    material->mTextures.Normal = mTextureManager->Get(material->mTextures.NormalID);
-    material->mTextures.ARM = mTextureManager->Get(material->mTextures.ARMID);
-    material->mTextures.Emissive = mTextureManager->Get(material->mTextures.EmissiveID);
     // 写入材质参数
     memcpy(material->mParamsUBOAllocationInfo.pMappedData, &material->mProperties, sizeof(MPBRMaterialProperties));
 
@@ -63,7 +73,7 @@ void MPBRMaterialManager::Write(std::shared_ptr<MPBRMaterial> material)
         .setBufferInfo(paramsBufferInfo)
         .setDescriptorCount(1);
     // albedo
-    vk::DescriptorImageInfo albedoImageInfo;
+    vk::DescriptorImageInfo albedoImageInfo{};
     albedoImageInfo.setImageLayout(vk::ImageLayout::eShaderReadOnlyOptimal)
         .setImageView(material->GetTextures().Albedo->GetImageView())
         .setSampler(material->GetTextures().Albedo->GetSampler());
@@ -74,7 +84,7 @@ void MPBRMaterialManager::Write(std::shared_ptr<MPBRMaterial> material)
         .setImageInfo(albedoImageInfo)
         .setDescriptorCount(1);
     // normal
-    vk::DescriptorImageInfo normalImageInfo;
+    vk::DescriptorImageInfo normalImageInfo{};
     normalImageInfo.setImageLayout(vk::ImageLayout::eShaderReadOnlyOptimal)
         .setImageView(material->GetTextures().Normal->GetImageView())
         .setSampler(material->GetTextures().Normal->GetSampler());
@@ -85,7 +95,7 @@ void MPBRMaterialManager::Write(std::shared_ptr<MPBRMaterial> material)
         .setImageInfo(normalImageInfo)
         .setDescriptorCount(1);
     // arm
-    vk::DescriptorImageInfo armImageInfo;
+    vk::DescriptorImageInfo armImageInfo{};
     armImageInfo.setImageLayout(vk::ImageLayout::eShaderReadOnlyOptimal)
         .setImageView(material->GetTextures().ARM->GetImageView())
         .setSampler(material->GetTextures().ARM->GetSampler());
@@ -96,7 +106,7 @@ void MPBRMaterialManager::Write(std::shared_ptr<MPBRMaterial> material)
         .setImageInfo(armImageInfo)
         .setDescriptorCount(1);
     // emissive
-    vk::DescriptorImageInfo emissiveImageInfo;
+    vk::DescriptorImageInfo emissiveImageInfo{};
     emissiveImageInfo.setImageLayout(vk::ImageLayout::eShaderReadOnlyOptimal)
         .setImageView(material->GetTextures().Emissive->GetImageView())
         .setSampler(material->GetTextures().Emissive->GetSampler());
@@ -112,21 +122,17 @@ void MPBRMaterialManager::Write(std::shared_ptr<MPBRMaterial> material)
 void MPBRMaterialManager::CreateDefault()
 {
 }
-std::shared_ptr<MPBRMaterial> MPBRMaterialManager::CreateDefaultMaterial()
+std::shared_ptr<MPBRMaterial> MPBRMaterialManager::CreateDefaultForwardOpaquePBRMaterial()
 {
     auto defaultMaterialSetting = MPBRMaterialSetting();
-    auto defaultPBRMaterial = Create(defaultMaterialSetting, "Default PBR Material");
-    defaultPBRMaterial->mPipelineName = PipelineType::ForwardOpaquePBR;
-    defaultPBRMaterial->mPipeline = mPipelineManager->Get(defaultPBRMaterial->mPipelineName);
-    defaultPBRMaterial->mTextures.AlbedoID = mTextureManager->GetDefaultTexture(DefaultTextureType::Albedo)->GetID();
-    defaultPBRMaterial->mTextures.NormalID = mTextureManager->GetDefaultTexture(DefaultTextureType::Normal)->GetID();
-    defaultPBRMaterial->mTextures.EmissiveID =
-        mTextureManager->GetDefaultTexture(DefaultTextureType::Emissive)->GetID();
-    defaultPBRMaterial->mTextures.ARMID = mTextureManager->GetDefaultTexture(DefaultTextureType::ARM)->GetID();
-    defaultPBRMaterial->mTextures.Albedo = mTextureManager->Get(defaultPBRMaterial->mTextures.AlbedoID);
-    defaultPBRMaterial->mTextures.Normal = mTextureManager->Get(defaultPBRMaterial->mTextures.NormalID);
-    defaultPBRMaterial->mTextures.ARM = mTextureManager->Get(defaultPBRMaterial->mTextures.ARMID);
-    defaultPBRMaterial->mTextures.Emissive = mTextureManager->Get(defaultPBRMaterial->mTextures.EmissiveID);
+    auto defaultMaterialProperties = MPBRMaterialProperties{};
+    auto defaultMaterialTextures = MPBRTextures{};
+    defaultMaterialTextures.AlbedoID = mTextureManager->GetDefaultTexture(DefaultTextureType::Albedo)->GetID();
+    defaultMaterialTextures.NormalID = mTextureManager->GetDefaultTexture(DefaultTextureType::Normal)->GetID();
+    defaultMaterialTextures.ARMID = mTextureManager->GetDefaultTexture(DefaultTextureType::ARM)->GetID();
+    defaultMaterialTextures.EmissiveID = mTextureManager->GetDefaultTexture(DefaultTextureType::Emissive)->GetID();
+    auto defaultPBRMaterial = Create("Default PBR Material", PipelineType::ForwardOpaquePBR, defaultMaterialProperties,
+                                     defaultMaterialTextures, defaultMaterialSetting);
     CreateVulkanResources(defaultPBRMaterial);
     Write(defaultPBRMaterial);
     return defaultPBRMaterial;

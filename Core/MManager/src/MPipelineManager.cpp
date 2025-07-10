@@ -30,11 +30,11 @@ MPipelineManager::MPipelineManager(std::shared_ptr<VulkanContext> vulkanContext,
     mGlobalDescriptorSetLayout = std::move(globalDescriptorSetLayout);
     CreateDefault();
 }
-std::shared_ptr<MPipeline> MPipelineManager::Create(const MPipelineSetting &setting, const std::string &name)
+std::shared_ptr<MPipeline> MPipelineManager::Create(const std::string &name, const MPipelineSetting &setting)
 {
     auto pipeline = std::make_shared<MPipeline>(mUUIDGenerator->Create(), name, mVulkanContext, setting);
-    mAssets[pipeline->GetID()] = pipeline;
-    mPipelines[pipeline->GetName()] = pipeline;
+    mAssets[pipeline->mID] = pipeline;
+    mPipelines[pipeline->mName] = pipeline;
     mMaterialDescriptorSetLayouts[pipeline->GetName()] = pipeline->mMaterialDescriptorSetLayouts.get();
     LogDebug("Create pipeline: {}", pipeline->GetName());
     return pipeline;
@@ -170,6 +170,11 @@ void MPipelineManager::CreateVulkanResources(std::shared_ptr<MPipeline> pipeline
     }
     pipeline->mPipeline = std::move(pipelineResult.value);
 }
+void MPipelineManager::Update(std::shared_ptr<MPipeline> pipeline)
+{
+    mAssets[pipeline->GetID()] = pipeline;
+    mPipelines[pipeline->GetName()] = pipeline;
+}
 vk::UniqueShaderModule MPipelineManager::CreateShaderModule(const std::filesystem::path &shaderPath) const
 
 {
@@ -203,9 +208,9 @@ vk::UniqueShaderModule MPipelineManager::CreateShaderModule(const std::filesyste
 
     return shaderModule;
 }
-void MPipelineManager::Remove(const std::string &name)
+void MPipelineManager::RemoveByName(const std::string &name)
 {
-    auto pipeline = Get(name);
+    auto pipeline = GetByName(name);
     if (!pipeline)
     {
         LogError("Failed to remove pipeline: Pipeline with name {} does not exist", name);
@@ -213,7 +218,7 @@ void MPipelineManager::Remove(const std::string &name)
     }
     Remove(pipeline->GetID());
 }
-std::shared_ptr<MPipeline> MPipelineManager::Get(const std::string &name) const
+std::shared_ptr<MPipeline> MPipelineManager::GetByName(const std::string &name) const
 {
     if (mPipelines.contains(name))
     {
@@ -259,7 +264,7 @@ void MPipelineManager::CreateDefault()
     pbrSetting.FragmentShaderPath = "Assets/Shaders/ForwardOpaquePBR.frag";
     pbrSetting.RenderPassType = RenderPassType::ForwardComposition;
     pbrSetting.MaterialDescriptorSetLayoutBindings = mDescriptorSetLayoutBindings;
-    auto pbrPipeline = Create(pbrSetting, PipelineType::ForwardOpaquePBR);
+    auto pbrPipeline = Create(PipelineType::ForwardOpaquePBR, pbrSetting);
     CreateVulkanResources(pbrPipeline);
 }
 

@@ -33,6 +33,10 @@ class UUID
     explicit UUID(const char *str);
     explicit UUID(const std::string &str);
     std::string ToString() const;
+    operator bool() const
+    {
+        return *this == UUID{};
+    }
     inline const std::array<uint8_t, 16> &GetData() const
     {
         return mData;

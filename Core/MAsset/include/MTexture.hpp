@@ -11,14 +11,13 @@
 #include <vector>
 #include <vulkan/vulkan.hpp>
 #include <vulkan/vulkan_handles.hpp>
+#include <vulkan/vulkan_structs.hpp>
 
 namespace MEngine::Core::Asset
 {
 class MTextureSetting final : public MAssetSetting
 {
   public:
-    uint32_t width = 1;
-    uint32_t height = 1;
     vk::ImageViewType ImageType = vk::ImageViewType::e2D;
     uint32_t mipmapLevels = 1;
     uint32_t arrayLayers = 1;
@@ -50,6 +49,12 @@ class MTextureSetting final : public MAssetSetting
   public:
     ~MTextureSetting() override = default;
 };
+struct TextureSize
+{
+    uint32_t width;
+    uint32_t height;
+    uint32_t channels;
+};
 class MTexture final : public MAsset
 {
     friend class nlohmann::adl_serializer<MTexture>;
@@ -57,6 +62,7 @@ class MTexture final : public MAsset
 
   private:
     std::shared_ptr<VulkanContext> mVulkanContext{};
+    TextureSize mSize{};
     std::vector<uint8_t> mImageData{};
     MTextureSetting mSetting{};
 
@@ -69,9 +75,9 @@ class MTexture final : public MAsset
     vk::DescriptorSet mThumbnailDescriptorSet{};
 
   public:
-    MTexture(const UUID &id, const std::string &name, std::shared_ptr<VulkanContext> vulkanContext,
-             const MTextureSetting &setting)
-        : MAsset(id, name), mSetting(setting), mVulkanContext(vulkanContext)
+    MTexture(const UUID &id, const std::string &name, std::shared_ptr<VulkanContext> vulkanContext, TextureSize size,
+             const std::vector<uint8_t> &imageData, const MTextureSetting &setting)
+        : MAsset(id, name), mSetting(setting), mVulkanContext(vulkanContext), mImageData(imageData), mSize(size)
     {
         mType = MAssetType::Texture;
         mState = MAssetState::Unloaded;
@@ -89,6 +95,10 @@ class MTexture final : public MAsset
         //      ImGui_ImplVulkan_RemoveTexture(mThumbnailDescriptorSet);
         //  }
     }
+    inline const TextureSize &GetSize() const
+    {
+        return mSize;
+    }
     inline const vk::Image &GetImage() const
     {
         return mImage;
@@ -105,13 +115,13 @@ class MTexture final : public MAsset
     {
         return mSetting;
     }
-    inline void SetSetting(const MTextureSetting &setting)
+    inline vk::DescriptorSet GetImGuiTextureID() const
     {
-        mSetting = setting;
+        return mThumbnailDescriptorSet;
     }
-    inline ImTextureID GetImGuiTextureID() const
+    inline void SetImGuiTextureID(vk::DescriptorSet thumbnailDescriptorSet)
     {
-        return reinterpret_cast<ImTextureID>(static_cast<VkDescriptorSet>(mThumbnailDescriptorSet));
+        mThumbnailDescriptorSet = thumbnailDescriptorSet;
     }
 };
 

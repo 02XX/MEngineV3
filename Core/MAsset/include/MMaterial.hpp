@@ -2,7 +2,6 @@
 
 #include "MAsset.hpp"
 #include "MPipeline.hpp"
-#include "MPipelineManager.hpp"
 #include <memory>
 #include <vulkan/vulkan_handles.hpp>
 
@@ -18,6 +17,7 @@ enum class MMaterialType
 class MMaterialSetting : public MAssetSetting
 {
   public:
+    ~MMaterialSetting() override = default;
 };
 class MMaterial : public MAsset
 {
@@ -32,8 +32,8 @@ class MMaterial : public MAsset
     std::shared_ptr<MPipeline> mPipeline;
 
   public:
-    MMaterial(const UUID &id, const std::string &name, const MMaterialSetting &setting)
-        : MAsset(id, name), mSetting(setting)
+    MMaterial(const UUID &id, const std::string &name, const std::string &pipelineName, const MMaterialSetting &setting)
+        : MAsset(id, name), mSetting(setting), mPipelineName(pipelineName)
     {
         mType = MAssetType::Material;
         mState = MAssetState::Unloaded;

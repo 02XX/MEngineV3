@@ -1,19 +1,17 @@
 #pragma once
 #include "IMManager.hpp"
 #include "MTexture.hpp"
+#include <cstdint>
 #include <memory>
+#include <vulkan/vulkan_enums.hpp>
 
 using namespace MEngine::Core::Asset;
 namespace MEngine::Core::Manager
 {
-struct TextureSize
-{
-    uint32_t width;
-    uint32_t height;
-    uint32_t channels;
-};
+
 enum class DefaultTextureType
 {
+    Magenta, // Used for missing textures in the editor
     White,
     Black,
     Normal,
@@ -21,32 +19,30 @@ enum class DefaultTextureType
     Albedo,
     ARM
 };
-class IMTextureManager : public virtual IMManager<MTexture, MTextureSetting>
+class IMTextureManager : public virtual IMManager<MTexture>
 {
   public:
     ~IMTextureManager() override = default;
-    // /**
-    //  * @brief 将图片写入到纹理
-    //  *
-    //  * @param texture 目标纹理
-    //  * @param path 图片路径
-    //  */
-    // virtual void Write(std::shared_ptr<MTexture> texture, const std::filesystem::path &path) = 0;
-    /**
-     * @brief 将数据写入到纹理
-     *
-     * @param texture 目标纹理
-     * @param data 数据
-     * @param extent 纹理尺寸
-     */
-    virtual void Write(std::shared_ptr<MTexture> texture, const std::vector<uint8_t> &data,
-                       const TextureSize &size) = 0;
+    virtual std::shared_ptr<MTexture> Create(const std::string &name, TextureSize size,
+                                             const std::vector<uint8_t> &imageData, const MTextureSetting &setting) = 0;
+    virtual void Write(std::shared_ptr<MTexture> texture) = 0;
     virtual std::shared_ptr<MTexture> CreateWhiteTexture() = 0;
     virtual std::shared_ptr<MTexture> CreateBlackTexture() = 0;
+    virtual std::shared_ptr<MTexture> CreateMagentaTexture() = 0;
     virtual std::shared_ptr<MTexture> CreateNormalTexture() = 0;
     virtual std::shared_ptr<MTexture> CreateEmissiveTexture() = 0;
     virtual std::shared_ptr<MTexture> CreateAlbedoTexture() = 0;
     virtual std::shared_ptr<MTexture> CreateARMTexture() = 0;
     virtual std::shared_ptr<MTexture> GetDefaultTexture(DefaultTextureType type) const = 0;
+    virtual std::shared_ptr<MTexture> CreateColorAttachment(uint32_t width, uint32_t height) = 0;
+    virtual std::shared_ptr<MTexture> CreateDepthStencilAttachment(uint32_t width, uint32_t height) = 0;
+    virtual std::vector<uint8_t> GetWhiteData() const = 0;
+    virtual std::vector<uint8_t> GetBlackData() const = 0;
+    virtual std::vector<uint8_t> GetNormalData() const = 0;
+    virtual std::vector<uint8_t> GetEmissiveData() const = 0;
+    virtual std::vector<uint8_t> GetAlbedoData() const = 0;
+    virtual std::vector<uint8_t> GetARMData() const = 0;
+    virtual std::vector<uint8_t> GetMagentaData() const = 0;
+    virtual std::vector<uint8_t> GetCheckerboardData() const = 0;
 };
 } // namespace MEngine::Core::Manager

@@ -13,12 +13,7 @@ namespace MEngine::Core::Asset
 class MMeshSetting : public MAssetSetting
 {
   public:
-    uint32_t vertexBufferSize = 0;
-    uint32_t indexBufferSize = 0;
-    vk::BufferUsageFlags vertexBufferUsage =
-        vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eTransferDst;
-    vk::BufferUsageFlags indexBufferUsage =
-        vk::BufferUsageFlagBits::eIndexBuffer | vk::BufferUsageFlagBits::eTransferDst;
+    ~MMeshSetting() override = default;
 };
 
 class MMesh : public MAsset
@@ -42,8 +37,8 @@ class MMesh : public MAsset
 
   public:
     MMesh(const UUID &id, const std::string &name, std::shared_ptr<VulkanContext> vulkanContext,
-          const MMeshSetting &setting)
-        : MAsset(id, name), mSetting(setting), mVulkanContext(vulkanContext)
+          const std::vector<Vertex> &vertices, const std::vector<uint32_t> &indices, const MMeshSetting &setting)
+        : MAsset(id, name), mSetting(setting), mVulkanContext(vulkanContext), mVertices(vertices), mIndices(indices)
     {
         mType = MAssetType::Mesh;
         mState = MAssetState::Unloaded;
@@ -67,14 +62,6 @@ class MMesh : public MAsset
     {
         return mIndices;
     }
-    inline void SetVertices(const std::vector<Vertex> &vertices)
-    {
-        mVertices = vertices;
-    }
-    inline void SetIndices(const std::vector<uint32_t> &indices)
-    {
-        mIndices = indices;
-    }
     inline const vk::Buffer GetVertexBuffer() const
     {
         return mVertexBuffer;
@@ -86,10 +73,6 @@ class MMesh : public MAsset
     inline const MMeshSetting &GetSetting() const
     {
         return mSetting;
-    }
-    inline void SetSetting(const MMeshSetting &setting)
-    {
-        mSetting = setting;
     }
     inline uint32_t GetIndexCount() const
     {

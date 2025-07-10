@@ -1,5 +1,7 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "ImageUtil.hpp"
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include <stb_image_write.h>
 namespace MEngine::Core::Utils
 {
 std::tuple<int, int, int, std::vector<uint8_t>> ImageUtil::LoadImage(const std::filesystem::path &path)
@@ -12,6 +14,7 @@ std::tuple<int, int, int, std::vector<uint8_t>> ImageUtil::LoadImage(const std::
     {
         throw std::runtime_error("Failed to load image: " + path.string());
     }
+    channels = 4; 
     imageData.assign(data, data + width * height * channels);
     stbi_image_free(data);
     return {width, height, channels, imageData};

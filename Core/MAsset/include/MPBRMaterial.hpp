@@ -1,5 +1,6 @@
 #pragma once
 #include "MMaterial.hpp"
+#include "MPipeline.hpp"
 #include "MTexture.hpp"
 #include "Math.hpp"
 #include "VulkanContext.hpp"
@@ -11,6 +12,8 @@ namespace MEngine::Core::Asset
 {
 class MPBRMaterialSetting final : public MMaterialSetting
 {
+  public:
+    ~MPBRMaterialSetting() override = default;
 };
 struct MPBRTextures
 {
@@ -50,8 +53,10 @@ class MPBRMaterial final : public MMaterial
 
   public:
     MPBRMaterial(const UUID &id, const std::string &name, std::shared_ptr<VulkanContext> vulkanContext,
-                 const MPBRMaterialSetting &setting)
-        : MMaterial(id, name, setting), mProperties(), mTextures(), mVulkanContext(vulkanContext)
+                 const std::string &pipelineName, const MPBRMaterialProperties &properties,
+                 const MPBRTextures &textures, const MPBRMaterialSetting &setting)
+        : MMaterial(id, name, pipelineName, setting), mSetting(setting), mVulkanContext(vulkanContext),
+          mProperties(properties), mTextures(textures)
     {
         mMaterialType = MMaterialType::PBR;
     }
@@ -62,13 +67,54 @@ class MPBRMaterial final : public MMaterial
             vmaDestroyBuffer(mVulkanContext->GetVmaAllocator(), mParamsUBO, mParamsUBOAllocation);
         }
     }
-    inline MPBRMaterialProperties GetProperties() const
+    inline const MPBRMaterialProperties &GetProperties() const
     {
         return mProperties;
     }
     inline const MPBRTextures &GetTextures() const
     {
         return mTextures;
+    }
+
+    inline void SetAlbedo(const glm::vec3 &albedo)
+    {
+        mProperties.Albedo = albedo;
+    }
+    inline void SetNormal(const glm::vec3 &normal)
+    {
+        mProperties.Normal = normal;
+    }
+    inline void SetMetallic(float metallic)
+    {
+        mProperties.Metallic = metallic;
+    }
+    inline void SetRoughness(float roughness)
+    {
+        mProperties.Roughness = roughness;
+    }
+    inline void SetAO(float ao)
+    {
+        mProperties.AO = ao;
+    }
+    inline void SetEmissiveIntensity(float emissiveIntensity)
+    {
+        mProperties.EmissiveIntensity = emissiveIntensity;
+    }
+    inline void SetAlbedoTextureID(const UUID &id)
+    {
+        mTextures.AlbedoID = id;
+    }
+    inline void SetNormalTextureID(const UUID &id)
+    {
+        mTextures.NormalID = id;
+    }
+    inline void SetARMTextureID(const UUID &id)
+    {
+        mTextures.ARMID = id;
+    }
+    inline void SetEmissiveTextureID(const UUID &id)
+    {
+        mTextures.EmissiveID = id;
     }
     inline void SetProperties(const MPBRMaterialProperties &properties)
     {

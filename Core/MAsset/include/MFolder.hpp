@@ -1,8 +1,10 @@
 #pragma once
 #include "MAsset.hpp"
 #include "MManager_fwd.hpp"
+#include "UUID.hpp"
 #include <memory>
 #include <nlohmann/json_fwd.hpp>
+#include <vector>
 namespace MEngine::Core::Asset
 {
 
@@ -18,12 +20,16 @@ class MFolder : public MAsset
 
   private:
     MFolderSetting mSetting;
+    UUID mParentFolderID;
+    std::vector<UUID> mChildrenIDs;
+    // 导航属性
     std::shared_ptr<MFolder> mParentFolder;
     std::vector<std::shared_ptr<MAsset>> mChildren;
 
   public:
-    MFolder(const UUID &id, const std::string &name, const MFolderSetting &setting)
-        : MAsset(id, name), mSetting(setting)
+    MFolder(const UUID &id, const std::string &name, const UUID &parentFolderID, const std::vector<UUID> &childrenIDs,
+            const MFolderSetting &setting)
+        : MAsset(id, name), mSetting(setting), mParentFolderID(parentFolderID), mChildrenIDs(childrenIDs)
     {
         mType = MAssetType::Folder;
         mState = MAssetState::Unloaded;

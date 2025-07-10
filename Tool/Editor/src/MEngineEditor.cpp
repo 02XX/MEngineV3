@@ -14,6 +14,7 @@
 #include "MMesh.hpp"
 #include "MMeshComponent.hpp"
 #include "MMeshManager.hpp"
+#include "MModel.hpp"
 #include "MModelManager.hpp"
 #include "MPBRMaterial.hpp"
 #include "MPBRMaterialManager.hpp"
@@ -32,10 +33,13 @@
 #include "TaskManager.hpp"
 #include "UUIDGenerator.hpp"
 #include "VulkanContext.hpp"
+#include <GLFW/glfw3.h>
 #include <ImGuizmo.h>
 #include <boost/di.hpp>
 #include <cstddef>
 #include <cstdint>
+#include <entt/entity/entity.hpp>
+#include <entt/entity/fwd.hpp>
 #include <entt/entt.hpp>
 #include <entt/meta/meta.hpp>
 #include <entt/meta/resolve.hpp>
@@ -47,6 +51,8 @@
 #include <imgui_impl_vulkan.h>
 #include <imgui_internal.h>
 #include <memory>
+#include <vulkan/vulkan_core.h>
+#include <vulkan/vulkan_handles.hpp>
 
 namespace MEngine::Editor
 {
@@ -97,8 +103,9 @@ void MEngineEditor::Init()
     lightTransform.localRotation = glm::quat(glm::vec3(0.0, -glm::half_pi<float>(), 0.0f));
 
     // bow
-    auto bowModel = mAssetDatabase->LoadFBX("Assets/BowArrow.fbx");
-    auto bowEntity = Function::Utils::EntityUtils::CreateEntity(registry, bowModel);
+    // auto bowModel = mAssetDatabase->LoadFBX("Assets/cubeTest.fbx");
+    // mAssetDatabase->SaveAsset(bowModel, mCurrentFolder->GetPath() / "cubeTest");
+    // auto bowEntity = Function::Utils::EntityUtils::CreateEntity(registry, bowModel);
     LogInfo("MEngine Editor initialized successfully");
 }
 void MEngineEditor::InitWindow()
@@ -144,6 +151,7 @@ void MEngineEditor::InitWindow()
     }
     glfwWindowHint(GLFW_VISIBLE, GLFW_TRUE);
     glfwMakeContextCurrent(mWindow);
+    SetGLFWCallBacks();
     LogDebug("GLFW window created successfully: {}x{}", mWindowConfig.width, mWindowConfig.height);
 }
 void MEngineEditor::InitVulkan()
@@ -214,16 +222,14 @@ void MEngineEditor::InitImGui()
     auto textureManager = injector.create<std::shared_ptr<IMTextureManager>>();
     auto loadIcon = [textureManager, this](const std::string &path, MAssetType type) {
         auto textureSetting = MTextureSetting{};
-        textureSetting.width = 200;
-        textureSetting.height = 200;
         textureSetting.isShaderResource = true;
-        mAssetIconTextures[type] =
-            textureManager->Create(textureSetting, "AssetIcon_" + std::string(magic_enum::enum_name(type)));
         auto [W, H, C, data] = Utils::ImageUtil::LoadImage(path);
+        mAssetIconTextures[type] = textureManager->Create(
+            "AssetIcon_" + std::string(magic_enum::enum_name(type)),
+            {static_cast<uint32_t>(W), static_cast<uint32_t>(H), static_cast<uint32_t>(C)}, data, textureSetting);
+
         textureManager->CreateVulkanResources(mAssetIconTextures[type]);
-        textureManager->Write(
-            mAssetIconTextures[type], data,
-            TextureSize{static_cast<uint32_t>(W), static_cast<uint32_t>(H), static_cast<uint32_t>(C)});
+        textureManager->Write(mAssetIconTextures[type]);
         mAssetIcons[type] = ImGui_ImplVulkan_AddTexture(
             mAssetIconTextures[type]->GetSampler(), mAssetIconTextures[type]->GetImageView(),
             static_cast<VkImageLayout>(vk::ImageLayout::eShaderReadOnlyOptimal));
@@ -231,7 +237,7 @@ void MEngineEditor::InitImGui()
     loadIcon("Assets/Icons/folder.png", MAssetType::Folder);
     loadIcon("Assets/Icons/texture.png", MAssetType::Texture);
     loadIcon("Assets/Icons/material.png", MAssetType::Material);
-    loadIcon("Assets/Icons/model.png", MAssetType::Mesh);
+    loadIcon("Assets/Icons/model.png", MAssetType::Model);
     loadIcon("Assets/Icons/shader.png", MAssetType::Shader);
     loadIcon("Assets/Icons/file.png", MAssetType::File);
     loadIcon("Assets/Icons/audio.png", MAssetType::Audio);
@@ -794,26 +800,26 @@ void MEngineEditor::RenderHierarchyPanel()
             }
             if (ImGui::BeginDragDropSource())
             {
-                ImGui::SetDragDropPayload("ENTITY_DRAG_DROP", &entity, sizeof(entt::entity));
+                ImGui::SetDragDropPayload("ENTITY", &entity, sizeof(entt::entity));
                 ImGui::Text("Move %s", name.data());
                 ImGui::EndDragDropSource();
             }
             if (ImGui::BeginDragDropTarget())
             {
-                if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload("ENTITY_DRAG_DROP"))
+                if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload("ENTITY"))
                 {
                     IM_ASSERT(payload->DataSize == sizeof(entt::entity));
-                    entt::entity draggedAsset = *(const entt::entity *)payload->Data;
+                    entt::entity draggedEntity = *(const entt::entity *)payload->Data;
 
                     // 重新设置父子关系
-                    auto &draggedTransform = registry->get<MTransformComponent>(draggedAsset);
+                    auto &draggedTransform = registry->get<MTransformComponent>(draggedEntity);
                     auto &targetTransform = registry->get<MTransformComponent>(entity);
                     // 判断拖拽实体是否已经是目标实体的后继节点
                     MTransformComponent targetTransformRoot = targetTransform;
                     bool isDescendant = false;
                     while (targetTransformRoot.parent != entt::null)
                     {
-                        if (targetTransformRoot.parent == draggedAsset)
+                        if (targetTransformRoot.parent == draggedEntity)
                         {
                             isDescendant = true;
                             break;
@@ -827,7 +833,7 @@ void MEngineEditor::RenderHierarchyPanel()
                         {
                             auto &parentTransform = registry->get<MTransformComponent>(draggedTransform.parent);
                             auto it = std::find(parentTransform.children.begin(), parentTransform.children.end(),
-                                                draggedAsset);
+                                                draggedEntity);
                             if (it != parentTransform.children.end())
                             {
                                 parentTransform.children.erase(it);
@@ -835,12 +841,11 @@ void MEngineEditor::RenderHierarchyPanel()
                         }
                         // 设置新的父节点
                         draggedTransform.parent = entity;
-                        targetTransform.children.push_back(draggedAsset);
+                        targetTransform.children.push_back(draggedEntity);
                     }
                 }
                 ImGui::EndDragDropTarget();
             }
-
             // 递归绘制子节点
             if (opened)
             {
@@ -865,6 +870,7 @@ void MEngineEditor::RenderHierarchyPanel()
         {
             renderEntity(entity);
         }
+
         // 右键菜单
         if (ImGui::BeginPopupContextWindow("HierarchyContextMenu", ImGuiPopupFlags_MouseButtonRight))
         {
@@ -879,30 +885,74 @@ void MEngineEditor::RenderHierarchyPanel()
                 {
                     auto vulkanContext = injector.create<std::shared_ptr<VulkanContext>>();
                     vulkanContext->GetDevice().waitIdle();
-                    auto &transformComponent = registry->get<MTransformComponent>(mSelectedEntity);
-                    // 删除子节点
-                    for (auto child : transformComponent.children)
-                    {
-                        if (registry->valid(child))
+                    std::function<void(entt::entity)> deleteEntity;
+                    deleteEntity = [this, &registry, &deleteEntity](entt::entity entity) {
+                        if (registry->valid(entity))
                         {
-                            registry->destroy(child);
+                            auto &transform = registry->get<MTransformComponent>(entity);
+                            // 删除子节点
+                            auto children = transform.children;
+                            for (auto child : children)
+                            {
+                                if (registry->valid(child))
+                                {
+                                    deleteEntity(child);
+                                }
+                            }
+                            if (transform.parent != entt::null)
+                            {
+                                auto &parentTransform = registry->get<MTransformComponent>(transform.parent);
+                                parentTransform.children.erase(std::remove(parentTransform.children.begin(),
+                                                                           parentTransform.children.end(), entity),
+                                                               parentTransform.children.end());
+                            }
+                            // 删除当前节点
+                            registry->destroy(entity);
                         }
-                    }
-                    if (transformComponent.parent != entt::null)
-                    {
-                        auto &parentTransform = registry->get<MTransformComponent>(transformComponent.parent);
-                        parentTransform.children.erase(std::remove(parentTransform.children.begin(),
-                                                                   parentTransform.children.end(), mSelectedEntity),
-                                                       parentTransform.children.end());
-                    }
-                    // 删除当前节点
-                    registry->destroy(mSelectedEntity);
+                    };
+                    deleteEntity(mSelectedEntity);
                     mSelectedEntity = entt::null;
-                    mHoveredEntity = entt::null;
                 }
             }
             ImGui::EndPopup();
         }
+    }
+    ImGuiWindow *window = ImGui::GetCurrentWindow();
+    ImRect windowRect(window->InnerRect.Min, window->InnerRect.Max);
+    if (ImGui::BeginDragDropTargetCustom(windowRect, ImGui::GetID("EmptySpaceDragDropTarget")))
+    {
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0, 0, 0, 0));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0, 0, 0, 0));
+        if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload("ASSET"))
+        {
+            IM_ASSERT(payload->DataSize == sizeof(std::shared_ptr<MAsset>));
+            auto draggedAsset = *static_cast<std::shared_ptr<MAsset> *>(payload->Data);
+            auto registry = injector.create<std::shared_ptr<entt::registry>>();
+            switch (draggedAsset->GetType())
+            {
+            case Core::Asset::MAssetType::Texture:
+            case Core::Asset::MAssetType::Material:
+            case Core::Asset::MAssetType::Mesh:
+            case Core::Asset::MAssetType::Model: {
+                auto model = std::dynamic_pointer_cast<MModel>(draggedAsset);
+                auto entity = Function::Utils::EntityUtils::CreateEntity(registry, model);
+                break;
+            }
+            case Core::Asset::MAssetType::Shader:
+            case Core::Asset::MAssetType::Animation:
+            case Core::Asset::MAssetType::Scene:
+            case Core::Asset::MAssetType::Audio:
+            case Core::Asset::MAssetType::Font:
+            case Core::Asset::MAssetType::Folder:
+            case Core::Asset::MAssetType::File:
+            case Core::Asset::MAssetType::Script:
+            case Core::Asset::MAssetType::Unknown:
+                break;
+            }
+        }
+        ImGui::EndDragDropTarget();
+        ImGui::PopStyleColor(3);
     }
     ImGui::EndChild();
     ImGui::End();
@@ -952,6 +1002,7 @@ void MEngineEditor::RenderInspectorPanel()
                             auto pbrMaterialManager = injector.create<std::shared_ptr<MPBRMaterialManager>>();
                             if (auto pbrMaterial = std::dynamic_pointer_cast<MPBRMaterial>(materialComponent.material))
                             {
+                                pbrMaterialManager->Update(pbrMaterial);
                                 pbrMaterialManager->Write(pbrMaterial);
                             }
                             break;
@@ -980,12 +1031,14 @@ void MEngineEditor::RenderInspectorPanel()
                 switch (mSelectedAsset->GetType())
                 {
                 case MAssetType::Texture: {
-                    auto metaAsset = entt::forward_as_meta(*std::static_pointer_cast<MTexture>(mSelectedAsset));
+                    auto texture = std::static_pointer_cast<MTexture>(mSelectedAsset);
+                    auto metaAsset = entt::forward_as_meta(*texture);
                     ReflectObject(metaAsset, entt::resolve<MTexture>());
                     break;
                 }
                 case MAssetType::Shader: {
-                    auto metaAsset = entt::forward_as_meta(*std::static_pointer_cast<MPipeline>(mSelectedAsset));
+                    auto pipeline = std::static_pointer_cast<MPipeline>(mSelectedAsset);
+                    auto metaAsset = entt::forward_as_meta(*pipeline);
                     ReflectObject(metaAsset, entt::resolve<MPipeline>());
                     break;
                 }
@@ -1072,6 +1125,13 @@ void MEngineEditor::RenderAssetPanel()
                 {
                     mHoveredAsset = asset;
                 }
+                // 拖拽
+                if (ImGui::BeginDragDropSource())
+                {
+                    ImGui::SetDragDropPayload("ASSET", &asset, sizeof(std::shared_ptr<MAsset>));
+                    ImGui::Image(reinterpret_cast<ImTextureID>(mAssetIcons[asset->GetType()]), ImVec2(50, 50));
+                    ImGui::EndDragDropSource();
+                }
                 auto selectableRectMin = ImGui::GetItemRectMin();
                 auto selectableRectMax = ImGui::GetItemRectMax();
                 auto selectableRectSize = ImGui::GetItemRectSize();
@@ -1090,6 +1150,7 @@ void MEngineEditor::RenderAssetPanel()
                 // ImGui::SetWindowFontScale(1.0f);
             }
             ImGui::EndGroup();
+
             ImGui::PopID();
             columnIndex++;
             if (columnIndex % mColumns != 0)
@@ -1106,27 +1167,47 @@ void MEngineEditor::RenderAssetPanel()
             if (ImGui::MenuItem("New Folder"))
             {
                 auto folder = mAssetDatabase->CreateFolder(mCurrentFolder->GetPath(), "New Folder", {});
-                mAssetDatabase->SaveFolder(folder);
+                mAssetDatabase->SaveFolder(folder, mCurrentFolder->GetPath() / "New Folder");
             }
             if (ImGui::MenuItem("New Texture"))
             {
+                auto textureManager = injector.create<std::shared_ptr<MTextureManager>>();
                 auto textureSetting = MTextureSetting{};
-                textureSetting.width = 512;
-                textureSetting.height = 512;
-                auto texture =
-                    mAssetDatabase->CreateAsset<MTexture>(mCurrentFolder->GetPath(), "New Texture", textureSetting);
-                mAssetDatabase->SaveAsset<MTexture>(texture);
+                auto texture = textureManager->Create("New Texture", {800, 600, 4}, {}, textureSetting);
+                mAssetDatabase->SaveAsset<MTexture>(texture, mCurrentFolder->GetPath() / "New Texture");
             }
             if (ImGui::MenuItem("New Pipeline"))
             {
+                auto pipelineManager = injector.create<std::shared_ptr<MPipelineManager>>();
                 auto pipelineSetting = MPipelineSetting{};
                 pipelineSetting.VertexShaderPath = "Assets/Shaders/ForwardOpaquePBR.vert";
                 pipelineSetting.FragmentShaderPath = "Assets/Shaders/ForwardOpaquePBR.frag";
-                auto pipeline =
-                    mAssetDatabase->CreateAsset<MPipeline>(mCurrentFolder->GetPath(), "New Pipeline", pipelineSetting);
-                mAssetDatabase->SaveAsset<MPipeline>(pipeline);
+                auto pipeline = pipelineManager->Create("New Pipeline", pipelineSetting);
+                mAssetDatabase->SaveAsset<MPipeline>(pipeline, mCurrentFolder->GetPath() / "New Pipeline");
             }
             ImGui::EndPopup();
+        }
+        // 拖拽目标
+        if (ImGui::BeginDragDropTarget())
+        {
+            if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload("ENTITY"))
+            {
+                entt::entity draggedEntity = *static_cast<const entt::entity *>(payload->Data);
+            }
+            ImGui::EndDragDropTarget();
+        }
+        ImGuiWindow *window = ImGui::GetCurrentWindow();
+        ImRect windowRect(window->InnerRect.Min, window->InnerRect.Max);
+        if (ImGui::BeginDragDropTargetCustom(windowRect, ImGui::GetID("EmptySpaceDragDropTarget")))
+        {
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0, 0, 0, 0));
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0, 0, 0, 0));
+            if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload("EXTERNAL_FILE"))
+            {
+            }
+            ImGui::PopStyleColor(3);
+            ImGui::EndDragDropTarget();
         }
         ImGui::EndChild();
     }
@@ -1259,6 +1340,11 @@ bool MEngineEditor::ReflectObject(entt::meta_any &instance, entt::meta_type type
                     auto metaTextures = entt::forward_as_meta(value);
                     ReflectObject(metaTextures, entt::resolve<MPBRTextures>());
                 }
+                else if (fieldType == entt::resolve<vk::DescriptorSet>())
+                {
+                    auto value = fieldValue.cast<vk::DescriptorSet>();
+                    ImGui::Image(reinterpret_cast<ImTextureID>(static_cast<VkDescriptorSet>(value)), ImVec2(100, 100));
+                }
                 else
                 {
                     ImGui::Text("%s: %s", fieldName, fieldType.info().name().data());
@@ -1271,6 +1357,31 @@ bool MEngineEditor::ReflectObject(entt::meta_any &instance, entt::meta_type type
                 }
                 else if (fieldType == entt::resolve<std::shared_ptr<MMaterial>>())
                 {
+                    auto draggableTexture = [&](const char *label, const std::shared_ptr<MTexture> &texture,
+                                                std::function<void(std::shared_ptr<MTexture>)> onModified = nullptr) {
+                        ImGui::Image(
+                            reinterpret_cast<ImTextureID>(static_cast<VkDescriptorSet>(texture->GetImGuiTextureID())),
+                            ImVec2(100, 100));
+                        if (ImGui::BeginDragDropTarget())
+                        {
+                            if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload("ASSET"))
+                            {
+                                IM_ASSERT(payload->DataSize == sizeof(std::shared_ptr<MAsset>));
+                                auto draggedAsset = *static_cast<std::shared_ptr<MAsset> *>(payload->Data);
+                                if (auto newTexture = std::dynamic_pointer_cast<MTexture>(draggedAsset))
+                                {
+                                    if (onModified)
+                                    {
+                                        onModified(newTexture);
+                                    }
+                                    isModified = true;
+                                }
+                            }
+                            ImGui::EndDragDropTarget();
+                        }
+                        ImGui::SameLine();
+                        ImGui::Text("%s", label);
+                    };
                     auto value = fieldValue.cast<std::shared_ptr<MMaterial>>();
                     // PBR Material
                     switch (value->GetMaterialType())
@@ -1278,10 +1389,44 @@ bool MEngineEditor::ReflectObject(entt::meta_any &instance, entt::meta_type type
                     case Core::Asset::MMaterialType::Unknown:
                     case Core::Asset::MMaterialType::PBR: {
                         auto pbrMaterial = std::static_pointer_cast<MPBRMaterial>(value);
-                        auto pbrMaterialMeta = entt::forward_as_meta(*pbrMaterial);
-                        if (ReflectObject(pbrMaterialMeta, entt::resolve<MPBRMaterial>()))
+                        auto pbrProperties = pbrMaterial->GetProperties();
+                        auto pbrMaterialMeta = entt::forward_as_meta(pbrProperties);
+                        if (ImGui::CollapsingHeader("PBR Material Properties"))
                         {
-                            isModified = true;
+
+                            if (ImGui::ColorEdit4("Albedo", glm::value_ptr(pbrProperties.Albedo),
+                                                  ImGuiColorEditFlags_HDR))
+                            {
+                                pbrMaterial->SetAlbedo(pbrProperties.Albedo);
+                                isModified = true;
+                            }
+                            if (ImGui::DragFloat("Metallic", &pbrProperties.Metallic, 0.01f, 0.0f, 1.0f))
+                            {
+                                pbrMaterial->SetMetallic(pbrProperties.Metallic);
+                                isModified = true;
+                            }
+                            if (ImGui::DragFloat("Roughness", &pbrProperties.Roughness, 0.01f, 0.0f, 1.0f))
+                            {
+                                pbrMaterial->SetRoughness(pbrProperties.Roughness);
+                                isModified = true;
+                            }
+                        }
+                        if (ImGui::CollapsingHeader("PBR Material Textures"))
+                        {
+                            auto pbrTextures = pbrMaterial->GetTextures();
+                            ImGui::Separator();
+                            draggableTexture("Albedo", pbrTextures.Albedo, [&](std::shared_ptr<MTexture> texture) {
+                                pbrMaterial->SetAlbedoTextureID(texture->GetID());
+                            });
+                            draggableTexture("Normal", pbrTextures.Normal, [&](std::shared_ptr<MTexture> texture) {
+                                pbrMaterial->SetNormalTextureID(texture->GetID());
+                            });
+                            draggableTexture("ARM", pbrTextures.ARM, [&](std::shared_ptr<MTexture> texture) {
+                                pbrMaterial->SetARMTextureID(texture->GetID());
+                            });
+                            draggableTexture("Emissive", pbrTextures.Emissive, [&](std::shared_ptr<MTexture> texture) {
+                                pbrMaterial->SetEmissiveTextureID(texture->GetID());
+                            });
                         }
                         break;
                     }
@@ -1295,7 +1440,9 @@ bool MEngineEditor::ReflectObject(entt::meta_any &instance, entt::meta_type type
                     auto value = fieldValue.cast<std::shared_ptr<MTexture>>();
                     if (value->GetSetting().isShaderResource)
                     {
-                        ImGui::Image(value->GetImGuiTextureID(), ImVec2(100, 100));
+                        ImGui::Image(
+                            reinterpret_cast<ImTextureID>(static_cast<VkDescriptorSet>(value->GetImGuiTextureID())),
+                            ImVec2(100, 100));
                         ImGui::SameLine();
                         ImGui::Text("%s", fieldName);
                     }
@@ -1318,5 +1465,32 @@ bool MEngineEditor::ReflectObject(entt::meta_any &instance, entt::meta_type type
         }
     }
     return isModified;
+}
+
+void MEngineEditor::SetGLFWCallBacks()
+{
+    // Set the drop callback
+    glfwSetWindowUserPointer(mWindow, this);
+    glfwSetDropCallback(mWindow, [](GLFWwindow *window, int count, const char *paths[]) {
+        auto instance = static_cast<MEngineEditor *>(glfwGetWindowUserPointer(window));
+        auto assetDatabase = injector.create<std::shared_ptr<AssetDatabase>>();
+        auto registry = injector.create<std::shared_ptr<entt::registry>>();
+        for (int i = 0; i < count; i++)
+        {
+            auto path = std::filesystem::path{paths[i]};
+            auto extension = path.extension();
+            auto fileName = path.filename().stem().string();
+            if (extension == ".fbx")
+            {
+                auto model = assetDatabase->LoadFBX(path);
+                assetDatabase->SaveAsset(model, instance->mCurrentFolder->GetPath() / fileName);
+            }
+            else if (extension == ".png" || extension == ".jpg" || extension == ".jpeg")
+            {
+                auto texture = assetDatabase->LoadPNG(path);
+                assetDatabase->SaveAsset(texture, instance->mCurrentFolder->GetPath() / fileName);
+            }
+        }
+    });
 }
 } // namespace MEngine::Editor

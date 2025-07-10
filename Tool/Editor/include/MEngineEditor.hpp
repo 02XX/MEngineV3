@@ -117,6 +117,7 @@ class MEngineEditor
     void RenderInspectorPanel();
     void RenderAssetPanel();
 
+    void SetGLFWCallBacks();
     uint32_t mFrameCount = 2;
     uint32_t mCurrentFrameIndex = 0;
     std::vector<VkDescriptorSet> mViewPortDescriptorSets{};
@@ -134,6 +135,6 @@ class MEngineEditor
     bool ReflectObject(entt::meta_any &instance, entt::meta_type type);
 
   private:
-    // UI控件
+
 };
 } // namespace MEngine::Editor

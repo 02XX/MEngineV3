@@ -54,16 +54,15 @@ class ResourceManager final
           mPipelineManager(pipelineManager), mPBRMaterialManager(pbrMaterialManager), mTextureManager(textureManager),
           mFolderManager(folderManager)
     {
-        RegisterManager<MTexture, MTextureSetting>(mTextureManager);
-        RegisterManager<MFolder, MFolderSetting>(mFolderManager);
-        RegisterManager<MPipeline, MPipelineSetting>(mPipelineManager);
-        RegisterManager<MMesh, MMeshSetting>(mMeshManager);
-        RegisterManager<MModel, MModelSetting>(mModelManager);
-        RegisterManager<MPBRMaterial, MPBRMaterialSetting>(mPBRMaterialManager);
+        RegisterManager<MTexture>(mTextureManager);
+        RegisterManager<MFolder>(mFolderManager);
+        RegisterManager<MPipeline>(mPipelineManager);
+        RegisterManager<MMesh>(mMeshManager);
+        RegisterManager<MModel>(mModelManager);
+        RegisterManager<MPBRMaterial>(mPBRMaterialManager);
         CreateDefaultAssets();
     }
-    template <std::derived_from<MAsset> TAsset, std::derived_from<MAssetSetting> TSetting>
-    void RegisterManager(std::shared_ptr<IMManager<TAsset, TSetting>> manager)
+    template <std::derived_from<MAsset> TAsset> void RegisterManager(std::shared_ptr<IMManager<TAsset>> manager)
     {
         auto typeIndex = std::type_index(typeid(TAsset));
         if (mManagers.contains(typeIndex))
@@ -74,8 +73,7 @@ class ResourceManager final
         mManagers[typeIndex] = manager;
         LogInfo("Registered manager for type: {}", typeIndex.name());
     }
-    template <std::derived_from<MAsset> TAsset, std::derived_from<MAssetSetting> TSetting,
-              std::derived_from<IMManager<TAsset, TSetting>> TManager>
+    template <std::derived_from<MAsset> TAsset, std::derived_from<IMManager<TAsset>> TManager>
     std::shared_ptr<TManager> GetManager() const
     {
         if (mManagers.contains(std::type_index(typeid(TAsset))))
@@ -84,22 +82,11 @@ class ResourceManager final
         }
         return nullptr;
     }
-    template <std::derived_from<MAsset> TAsset, std::derived_from<MAssetSetting> TSetting>
-    std::shared_ptr<TAsset> CreateAsset(const TSetting &setting)
-    {
-        auto manager = std::static_pointer_cast<IMManager<TAsset, TSetting>>(mManagers.at(typeid(TAsset)));
-        if (!manager)
-        {
-            LogError("Manager for asset type {} not found.", typeid(TAsset).name());
-            throw std::runtime_error("Manager for asset type " + std::string(typeid(TAsset).name()) + " not found.");
-        }
-        auto asset = manager->Create(setting, "New Asset");
-        return asset;
-    }
+    
     template <std::derived_from<MAsset> TAsset> std::shared_ptr<TAsset> GetAsset(const UUID &id) const
     {
         auto typeIndex = std::type_index(typeid(TAsset));
-        auto manager = std::static_pointer_cast<IMManager<TAsset, MAssetSetting>>(mManagers.at(typeIndex));
+        auto manager = std::static_pointer_cast<IMManager<TAsset>>(mManagers.at(typeIndex));
         return manager->Get(id);
     }
     void UpdateAsset(const UUID &id);

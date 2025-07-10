@@ -1,4 +1,5 @@
 #pragma once
+#include "IMFolderManager.hpp"
 #include "Logger.hpp"
 #include "MAsset.hpp"
 #include "MFolder.hpp"
@@ -32,20 +33,6 @@ class AssetDatabase
     AssetDatabase(std::shared_ptr<ResourceManager> resourceManager) : mResourceManager(resourceManager)
     {
     }
-    // basic
-    //  Create
-    template <std::derived_from<MAsset> TAsset, std::derived_from<MAssetSetting> TSetting>
-    std::shared_ptr<TAsset> CreateAsset(const std::filesystem::path &parentPath, const std::string &assetName,
-                                        const TSetting &setting = {})
-    {
-        auto asset = mResourceManager->CreateAsset<TAsset>(setting);
-        asset->SetPath(GenerateUniqueAssetPath(parentPath / assetName));
-        if (auto folder = GetAsset<MFolder>(parentPath))
-        {
-            folder->AddChild(asset);
-        }
-        return asset;
-    }
     //  Read
     std::shared_ptr<MAsset> GetAsset(const std::filesystem::path &path) const;
     template <std::derived_from<MAsset> TAsset>
@@ -70,17 +57,36 @@ class AssetDatabase
         auto asset = LoadAsset(path);
         return std::static_pointer_cast<TAsset>(asset);
     }
-    template <std::derived_from<MAsset> TAsset> void SaveAsset(std::shared_ptr<TAsset> asset)
+    template <std::derived_from<MAsset> TAsset>
+    void SaveAsset(std::shared_ptr<TAsset> asset, const std::filesystem::path &path)
     {
-        std::ofstream file(asset->GetPath());
+        auto savePath = path;
+        if (savePath.has_extension())
+        {
+            savePath.replace_extension(".masset");
+        }
+        else
+        {
+            savePath += ".masset";
+        }
+        auto uniquePath = GenerateUniqueAssetPath(savePath);
+        std::ofstream file(uniquePath);
         if (!file.is_open())
         {
-            throw std::runtime_error("Failed to open asset file for writing: " + asset->GetPath().string());
+            throw std::runtime_error("Failed to open asset file for writing: " + uniquePath.string());
         }
+        asset->SetPath(uniquePath);
+        asset->SetName(uniquePath.filename().stem().string());
         json j;
         j = *asset;
         file << j.dump(4);
         file.close();
+        auto folderManager = mResourceManager->GetManager<MFolder, IMFolderManager>();
+        auto parentFolder = folderManager->Get(mPath2UUID[uniquePath.parent_path()]);
+        if (parentFolder != nullptr)
+        {
+            parentFolder->AddChild(asset);
+        }
         mPath2UUID[asset->GetPath()] = asset->GetID();
     }
 
@@ -89,7 +95,7 @@ class AssetDatabase
                                           const MFolderSetting &setting = {});
     void DeleteFolder(const std::filesystem::path &directory);
     std::shared_ptr<MFolder> LoadFolder(const std::filesystem::path &directory);
-    void SaveFolder(std::shared_ptr<MFolder> folder);
+    void SaveFolder(std::shared_ptr<MFolder> folder, const std::filesystem::path &directory);
     // Operations
     std::filesystem::path GenerateUniqueAssetPath(std::filesystem::path path);
     void MoveAsset(const std::filesystem::path &srcPath, const std::filesystem::path &dstPath);
@@ -100,7 +106,7 @@ class AssetDatabase
                                           const std::filesystem::path &parentDirectory = {});
     // External Assets
     std::shared_ptr<MModel> LoadFBX(const std::filesystem::path &path);
-    std::shared_ptr<MTexture> LoadImage(const std::filesystem::path &path);
+    std::shared_ptr<MTexture> LoadPNG(const std::filesystem::path &path);
 };
 } // namespace Editor
 } // namespace MEngine
