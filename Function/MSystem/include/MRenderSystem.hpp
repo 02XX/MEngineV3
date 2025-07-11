@@ -33,7 +33,8 @@ class MRenderSystem final : public MSystem
     std::vector<vk::UniqueFence> mInFlightFences;
     std::vector<vk::Semaphore> mImageAvailableSemaphores;
     std::vector<vk::UniqueSemaphore> mRenderFinishedSemaphores;
-    std::unordered_map<std::shared_ptr<MPipeline>, std::vector<entt::entity>> mRenderQueue;
+    std::unordered_map<RenderPassType, std::unordered_map<std::shared_ptr<MPipeline>, std::vector<entt::entity>>>
+        mRenderQueue;
     struct RenderTarget
     {
         uint32_t width{1280};
@@ -68,9 +69,13 @@ class MRenderSystem final : public MSystem
                 // , albedoClearValue, normalClearValue, worldPosClearValue, armClearValue, emissiveClearValue
             };
         }
+        inline vk::Extent3D GetExtent() const
+        {
+            return vk::Extent3D{width, height, 1};
+        }
     };
     std::vector<RenderTarget> mRenderTargets;
-    std::unordered_map<RenderPassType, std::vector<vk::UniqueFramebuffer>> mFramebuffers;
+    std::vector<vk::UniqueFramebuffer> mFramebuffers;
 
     entt::entity mMainCameraEntity{};
     std::vector<vk::UniqueDescriptorSet> mGlobalDescriptorSets;
@@ -154,12 +159,9 @@ class MRenderSystem final : public MSystem
     void CreateRenderTarget();
     void CreateFramebuffer();
     void Batch();
-    void Prepare(vk::CommandBuffer commandBuffer, vk::Fence fence);
-    void RenderForwardCompositePass(vk::CommandBuffer commandBuffer, vk::Extent2D extent, vk::Framebuffer framebuffer,
-                                    vk::Pipeline pipeline, vk::DescriptorSet globalDescriptorSet,
-                                    const std::vector<entt::entity> &entities);
-    void End(vk::CommandBuffer commandBuffer, vk::Fence fence, vk::Semaphore signalSemaphore,
-             vk::Semaphore waitSemaphore);
+    void Prepare();
+    void RenderForwardCompositePass();
+    void End();
     void WriteGlobalDescriptorSet(uint32_t globalDescriptorSetIndex);
     // void RenderPostProcessPass();
 };

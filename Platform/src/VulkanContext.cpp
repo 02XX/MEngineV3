@@ -1,6 +1,9 @@
 #include "VulkanContext.hpp"
 #include "Logger.hpp"
+#include <algorithm>
 #include <set>
+#include <vector>
+#include <vulkan/vulkan_to_string.hpp>
 namespace MEngine
 {
 
@@ -56,6 +59,23 @@ void VulkanContext::CreateInstance()
         .setPEngineName({})
         .setEngineVersion({})
         .setApiVersion(Version);
+    // 获取所有可用的实例扩展
+    auto availableExtensions = vk::enumerateInstanceExtensionProperties();
+    for (auto &ext : availableExtensions)
+    {
+        LogTrace("Available Vulkan instance extension: {}", ext.extensionName.data());
+    }
+
+    for (auto &ext : mConfig.InstanceRequiredExtensions)
+    {
+        if (std::ranges::find_if(availableExtensions, [&ext](const vk::ExtensionProperties &availableExt) {
+                return std::string(availableExt.extensionName) == ext;
+            }) == availableExtensions.end())
+        {
+            LogError("Vulkan instance extension {} is not available", ext);
+            throw std::runtime_error("Vulkan instance extension not available");
+        }
+    }
     instanceCreateInfo.setFlags({})
         .setPApplicationInfo(&appInfo)
         .setPEnabledLayerNames(mConfig.InstanceRequiredLayers)
@@ -178,6 +198,14 @@ void VulkanContext::CreateLogicalDevice()
         queueCreateInfo.setQueueFamilyIndex(queueFamily).setQueueCount(1).setPQueuePriorities(&queuePriority);
         queueCreateInfos.push_back(queueCreateInfo);
     }
+    // extension
+    auto availableExtensions = PhysicalDevice.enumerateDeviceExtensionProperties();
+    for (auto &ext : availableExtensions)
+    {
+        LogTrace("Available Vulkan device extension: {}", ext.extensionName.data());
+    }
+    std::vector<const char *> extensions = {"VK_KHR_maintenance1"};
+    mConfig.DeviceRequiredExtensions.insert_range(mConfig.DeviceRequiredExtensions.end(), extensions);
     deviceCreateInfo.setQueueCreateInfos(queueCreateInfos)
         .setPEnabledExtensionNames(mConfig.DeviceRequiredExtensions)
         .setPEnabledLayerNames(mConfig.DeviceRequiredLayers)

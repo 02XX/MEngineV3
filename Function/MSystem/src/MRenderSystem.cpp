@@ -86,37 +86,9 @@ void MRenderSystem::Init()
 void MRenderSystem::Update(float deltaTime)
 {
     Batch();
-
-    auto commandBuffer = mGraphicsCommandBuffers[mCurrentFrameIndex].get();
-    auto inFlightFence = mInFlightFences[mCurrentFrameIndex].get();
-    auto width = mRenderTargets[mCurrentFrameIndex].width;
-    auto height = mRenderTargets[mCurrentFrameIndex].height;
-    auto renderFinishedSemaphore = mRenderFinishedSemaphores[mCurrentFrameIndex].get();
-    auto imageAvailableSemaphore = mImageAvailableSemaphores[mCurrentFrameIndex];
-    auto globalDescriptorSet = mGlobalDescriptorSets[mCurrentFrameIndex].get();
-    Prepare(commandBuffer, inFlightFence);
-    for (const auto &[pipeline, entities] : mRenderQueue)
-    {
-        auto renderPassType = pipeline->GetSetting().RenderPassType;
-        switch (renderPassType)
-        {
-        case RenderPassType::ShadowDepth:
-        case RenderPassType::DeferredComposition:
-            break;
-        case RenderPassType::ForwardComposition: {
-            auto framebuffer = mFramebuffers[RenderPassType::ForwardComposition][mCurrentFrameIndex].get();
-            RenderForwardCompositePass(commandBuffer, {width, height}, framebuffer, pipeline->GetPipeline(),
-                                       globalDescriptorSet, entities);
-            break;
-        }
-        case RenderPassType::Sky:
-        case RenderPassType::Transparent:
-        case RenderPassType::PostProcess:
-        case RenderPassType::UI:
-            break;
-        }
-    }
-    End(commandBuffer, inFlightFence, renderFinishedSemaphore, nullptr);
+    Prepare();
+    RenderForwardCompositePass();
+    End();
     mCurrentFrameIndex = (mCurrentFrameIndex + 1) % mFrameCount;
 }
 void MRenderSystem::Shutdown()
@@ -144,7 +116,7 @@ void MRenderSystem::CreateRenderTarget()
 }
 void MRenderSystem::CreateFramebuffer()
 {
-    mFramebuffers[RenderPassType::ForwardComposition].resize(mFrameCount);
+    mFramebuffers.resize(mFrameCount);
     for (uint32_t i = 0; i < mFrameCount; ++i)
     {
         std::vector<vk::ImageView> attachments;
@@ -152,13 +124,12 @@ void MRenderSystem::CreateFramebuffer()
         attachments.push_back(mRenderTargets[i].depthStencilTexture->GetImageView());
         // 创建Framebuffer
         vk::FramebufferCreateInfo framebufferCreateInfo;
-        framebufferCreateInfo.setRenderPass(mRenderPassManager->GetRenderPass(RenderPassType::ForwardComposition))
+        framebufferCreateInfo.setRenderPass(mRenderPassManager->GetCompositionRenderPass())
             .setAttachments(attachments)
             .setWidth(mRenderTargets[i].width)
             .setHeight(mRenderTargets[i].height)
             .setLayers(1);
-        mFramebuffers[RenderPassType::ForwardComposition][i] =
-            mVulkanContext->GetDevice().createFramebufferUnique(framebufferCreateInfo);
+        mFramebuffers[i] = mVulkanContext->GetDevice().createFramebufferUnique(framebufferCreateInfo);
     }
 }
 void MRenderSystem::ReSizeFrameBuffer(uint32_t width, uint32_t height)
@@ -183,11 +154,15 @@ void MRenderSystem::Batch()
         auto &transformComponent = view.get<MTransformComponent>(entity);
         auto &meshComponent = view.get<MMeshComponent>(entity);
         auto &materialComponent = view.get<MMaterialComponent>(entity);
-        mRenderQueue[materialComponent.material->GetPipeline()].push_back(entity);
+        auto renderPassType = materialComponent.material->GetPipeline()->GetSetting().RenderPassType;
+        auto pipeline = materialComponent.material->GetPipeline();
+        mRenderQueue[renderPassType][pipeline].push_back(entity);
     }
 }
-void MRenderSystem::Prepare(vk::CommandBuffer commandBuffer, vk::Fence fence)
+void MRenderSystem::Prepare()
 {
+    auto commandBuffer = mGraphicsCommandBuffers[mCurrentFrameIndex].get();
+    auto fence = mInFlightFences[mCurrentFrameIndex].get();
     // 相机
     auto cameraView = mRegistry->view<MTransformComponent, MCameraComponent>();
     for (auto camera : cameraView)
@@ -236,16 +211,20 @@ void MRenderSystem::Prepare(vk::CommandBuffer commandBuffer, vk::Fence fence)
     commandBuffer.begin(beginInfo);
     WriteGlobalDescriptorSet(mCurrentFrameIndex);
 }
-void MRenderSystem::RenderForwardCompositePass(vk::CommandBuffer commandBuffer, vk::Extent2D extent,
-                                               vk::Framebuffer framebuffer, vk::Pipeline pipeline,
-                                               vk::DescriptorSet globalDescriptorSet,
-                                               const std::vector<entt::entity> &entities)
+void MRenderSystem::RenderForwardCompositePass()
 {
+    auto commandBuffer = mGraphicsCommandBuffers[mCurrentFrameIndex].get();
+    auto extent = mRenderTargets[mCurrentFrameIndex].GetExtent();
+    auto framebuffer = mFramebuffers[mCurrentFrameIndex].get();
+    auto renderPassType = RenderPassType::ForwardComposition;
+    auto &&[renderPass, subpass] = mRenderPassManager->GetRenderPass(renderPassType);
+    auto globalDescriptorSet = mGlobalDescriptorSets[mCurrentFrameIndex].get();
+
     vk::RenderPassBeginInfo renderPassBeginInfo;
     auto clearValues = RenderTarget::GetClearValues();
     auto width = extent.width;
     auto height = extent.height;
-    renderPassBeginInfo.setRenderPass(mRenderPassManager->GetRenderPass(RenderPassType::ForwardComposition))
+    renderPassBeginInfo.setRenderPass(renderPass)
         .setFramebuffer(framebuffer)
         .setRenderArea({{0, 0}, {width, height}})
         .setClearValues(clearValues);
@@ -253,48 +232,54 @@ void MRenderSystem::RenderForwardCompositePass(vk::CommandBuffer commandBuffer, 
     commandBuffer.beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
     vk::Viewport viewport;
     viewport.setX(0.0f)
-        .setY(0.0f)
+        .setY(height)
         .setWidth(static_cast<float>(width))
-        .setHeight(static_cast<float>(height))
+        .setHeight(-static_cast<float>(height))
         .setMinDepth(0.0f)
         .setMaxDepth(1.0f);
     commandBuffer.setViewport(0, {viewport});
     vk::Rect2D scissor;
     scissor.setOffset({0, 0}).setExtent({width, height});
     commandBuffer.setScissor(0, {scissor});
-    commandBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline);
-    for (const entt::entity &entity : entities)
+    for (const auto &[pipeline, entities] : mRenderQueue[renderPassType])
     {
-        auto &materialComponent = mRegistry->get<MMaterialComponent>(entity);
-        auto &meshComponent = mRegistry->get<MMeshComponent>(entity);
-        auto &transformComponent = mRegistry->get<MTransformComponent>(entity);
-        // 1. 绑定 push_constants
-        commandBuffer.pushConstants(materialComponent.material->GetPipeline()->GetPipelineLayout(),
-                                    vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment, 0,
-                                    sizeof(glm::mat4), &transformComponent.modelMatrix);
-        // 2. 绑定Global描述符集
-        commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
-                                         materialComponent.material->GetPipeline()->GetPipelineLayout(), 0,
-                                         globalDescriptorSet, {});
-        // 3. 绑定材质描述符集
-        commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
-                                         materialComponent.material->GetPipeline()->GetPipelineLayout(), 1,
-                                         materialComponent.material->GetMaterialDescriptorSet(), {});
-        // 4. 绑定顶点缓冲区
-        auto vertexBuffer = meshComponent.mesh->GetVertexBuffer();
-        commandBuffer.bindVertexBuffers(0, vertexBuffer, {0});
-        // 5. 绑定索引缓冲区
-        auto indexBuffer = meshComponent.mesh->GetIndexBuffer();
-        commandBuffer.bindIndexBuffer(indexBuffer, 0, vk::IndexType::eUint32);
-        // 6. 绘制Draw Call
-        commandBuffer.drawIndexed(meshComponent.mesh->GetIndexCount(), 1, 0, 0, 0);
+        commandBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline->GetPipeline());
+        for (auto entity : entities)
+        {
+            auto &materialComponent = mRegistry->get<MMaterialComponent>(entity);
+            auto &meshComponent = mRegistry->get<MMeshComponent>(entity);
+            auto &transformComponent = mRegistry->get<MTransformComponent>(entity);
+            // 1. 绑定 push_constants
+            commandBuffer.pushConstants(materialComponent.material->GetPipeline()->GetPipelineLayout(),
+                                        vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment, 0,
+                                        sizeof(glm::mat4), &transformComponent.modelMatrix);
+            // 2. 绑定Global描述符集
+            commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+                                             materialComponent.material->GetPipeline()->GetPipelineLayout(), 0,
+                                             globalDescriptorSet, {});
+            // 3. 绑定材质描述符集
+            commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+                                             materialComponent.material->GetPipeline()->GetPipelineLayout(), 1,
+                                             materialComponent.material->GetMaterialDescriptorSet(), {});
+            // 4. 绑定顶点缓冲区
+            auto vertexBuffer = meshComponent.mesh->GetVertexBuffer();
+            commandBuffer.bindVertexBuffers(0, vertexBuffer, {0});
+            // 5. 绑定索引缓冲区
+            auto indexBuffer = meshComponent.mesh->GetIndexBuffer();
+            commandBuffer.bindIndexBuffer(indexBuffer, 0, vk::IndexType::eUint32);
+            // 6. 绘制Draw Call
+            commandBuffer.drawIndexed(meshComponent.mesh->GetIndexCount(), 1, 0, 0, 0);
+        }
     }
     // commandBuffer.nextSubpass(vk::SubpassContents::eInline);
     commandBuffer.endRenderPass();
 }
-void MRenderSystem::End(vk::CommandBuffer commandBuffer, vk::Fence fence, vk::Semaphore signalSemaphore,
-                        vk::Semaphore waitSemaphore)
+void MRenderSystem::End()
 {
+    auto commandBuffer = mGraphicsCommandBuffers[mCurrentFrameIndex].get();
+    auto fence = mInFlightFences[mCurrentFrameIndex].get();
+    auto signalSemaphore = mRenderFinishedSemaphores[mCurrentFrameIndex].get();
+    auto waitSemaphore = mImageAvailableSemaphores[mCurrentFrameIndex];
     commandBuffer.end();
     vk::SubmitInfo submitInfo;
     vk::PipelineStageFlags waitStage = vk::PipelineStageFlagBits::eColorAttachmentOutput;

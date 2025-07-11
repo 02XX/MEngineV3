@@ -675,8 +675,7 @@ void MEngineEditor::RenderViewportPanel()
     ImVec2 windowPos = ImGui::GetWindowPos();
     ImVec2 windowSize = ImGui::GetContentRegionAvail();
     ImVec2 viewPortSize = {windowSize.x, windowSize.x * mCurrentResolution.height * 1.0f / mCurrentResolution.width};
-    ImGui::Image(reinterpret_cast<ImTextureID>(mViewPortDescriptorSets[mCurrentFrameIndex]), viewPortSize, ImVec2(0, 1),
-                 ImVec2(1, 0));
+    ImGui::Image(reinterpret_cast<ImTextureID>(mViewPortDescriptorSets[mCurrentFrameIndex]), viewPortSize);
     // 设置 ImGuizmo 绘制区域
     ImVec2 imagePos = ImGui::GetItemRectMin();
     ImVec2 imageSize = ImGui::GetItemRectSize();

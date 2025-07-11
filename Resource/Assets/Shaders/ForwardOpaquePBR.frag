@@ -148,7 +148,8 @@ void main()
         float NoV = clamp(dot(N,V),0,1.0f);
         if(lights.parameters[i].LightType == 0) // 平行光
         {
-            vec3 LIGHT = -lights.parameters[i].Direction; 
+            vec4 lightDirection4 = cameraParams.parameters.viewMatrix * vec4(lights.parameters[i].Direction, 0.0); // Convert to 4-component vector
+            vec3 LIGHT = -normalize(lightDirection4.xyz); // Extract 3-component vector and normalize
             vec3 L = normalize(LIGHT);
             vec3 H = normalize(L + V);
             float VoH = clamp(dot(V,H),0,1.0f);

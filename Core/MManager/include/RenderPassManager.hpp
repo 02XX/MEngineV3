@@ -1,28 +1,14 @@
 #pragma once
 #include "MPipeline.hpp"
 #include "VulkanContext.hpp"
+#include <cstdint>
 #include <memory>
+#include <tuple>
 #include <unordered_map>
+#include <vulkan/vulkan_handles.hpp>
 using namespace MEngine::Core::Asset;
 namespace MEngine::Core::Manager
 {
-// struct RenderTarget
-// {
-//     // Render target 0: Color
-//     Asset::MTexture colorTexture;
-//     // Render target 1: Depth/Stencil
-//     Asset::MTexture depthStencilTexture;
-//     // Render target 2: Albedo
-//     Asset::MTexture albedoTexture;
-//     // Render target 3: Normal
-//     Asset::MTexture normalTexture;
-//     // Render target 4: WorldPos
-//     Asset::MTexture worldPosTexture;
-//     // Render target 5: ARM (Ambient Occlusion, Roughness, Metallic)
-//     Asset::MTexture armTexture;
-//     // Render target 6: Emissive
-//     Asset::MTexture emissiveTexture;
-// };
 class RenderPassManager final
 {
   private:
@@ -30,16 +16,11 @@ class RenderPassManager final
     std::shared_ptr<VulkanContext> mVulkanContext;
 
   private:
-    std::unordered_map<RenderPassType, vk::UniqueRenderPass> mRenderPasses;
+    std::unordered_map<RenderPassType, uint32_t> mSubPasses;
+    vk::UniqueRenderPass mCompositionRenderPass;
 
   private:
-    void CreateShadowDepthRenderPass();
-    void CreateDeferredCompositionRenderPass();
-    void CreateForwardCompositionRenderPass();
-    void CreateSkyRenderPass();
-    void CreateTransparentRenderPass();
-    void CreatePostProcessRenderPass();
-    void CreateUIRenderPass();
+    void CreateCompositionRenderPass();
     inline vk::Format GetRenderTargetFormat()
     {
         return vk::Format::eR32G32B32A32Sfloat; // 32位浮点数RGBA
@@ -52,15 +33,13 @@ class RenderPassManager final
   public:
     RenderPassManager(std::shared_ptr<VulkanContext> vulkanContext) : mVulkanContext(vulkanContext)
     {
-        CreateShadowDepthRenderPass();
-        CreateDeferredCompositionRenderPass();
-        CreateForwardCompositionRenderPass();
-        CreateSkyRenderPass();
-        CreateTransparentRenderPass();
-        CreatePostProcessRenderPass();
-        CreateUIRenderPass();
+        CreateCompositionRenderPass();
     }
-    vk::RenderPass GetRenderPass(RenderPassType type) const;
+    std::tuple<vk::RenderPass, uint32_t> GetRenderPass(RenderPassType type) const;
+    inline vk::RenderPass GetCompositionRenderPass() const
+    {
+        return mCompositionRenderPass.get();
+    }
 };
 
 } // namespace MEngine::Core::Manager

@@ -146,7 +146,7 @@ void MPipelineManager::CreateVulkanResources(std::shared_ptr<MPipeline> pipeline
     dynamicStateInfo.setDynamicStates(dynamicStates);
     // ========== 10. 管线布局 ==========
     // ========== 11. 渲染通道 ==========
-    auto renderPass = mRenderPassManager->GetRenderPass(pipeline->mSetting.RenderPassType);
+    auto &&[renderPass, subpass] = mRenderPassManager->GetRenderPass(pipeline->mSetting.RenderPassType);
     // ========== 12. 管线创建 ==========
     vk::GraphicsPipelineCreateInfo pipelineInfo{};
     pipelineInfo.setStageCount(static_cast<uint32_t>(shaderStages.size()))
@@ -161,7 +161,7 @@ void MPipelineManager::CreateVulkanResources(std::shared_ptr<MPipeline> pipeline
         .setPDynamicState(&dynamicStateInfo)
         .setLayout(pipeline->mPipelineLayout.get())
         .setRenderPass(renderPass)
-        .setSubpass(0);
+        .setSubpass(subpass);
     auto pipelineResult =
         mVulkanContext->GetDevice().createGraphicsPipelineUnique(vk::PipelineCache(), pipelineInfo, nullptr);
     if (pipelineResult.result != vk::Result::eSuccess)
