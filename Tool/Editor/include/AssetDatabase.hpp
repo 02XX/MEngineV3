@@ -70,16 +70,16 @@ class AssetDatabase
             savePath += ".masset";
         }
         auto uniquePath = GenerateUniqueAssetPath(savePath);
-        std::ofstream file(uniquePath);
+        std::ofstream file(uniquePath, std::ios::binary);
         if (!file.is_open())
         {
             throw std::runtime_error("Failed to open asset file for writing: " + uniquePath.string());
         }
         asset->SetPath(uniquePath);
         asset->SetName(uniquePath.filename().stem().string());
-        json j;
-        j = *asset;
-        file << j.dump(4);
+        json j = *asset;
+        auto msgPack = json::to_msgpack(j);
+        file.write(reinterpret_cast<const char *>(msgPack.data()), msgPack.size());
         file.close();
         auto folderManager = mResourceManager->GetManager<MFolder, IMFolderManager>();
         auto parentFolder = folderManager->Get(mPath2UUID[uniquePath.parent_path()]);

@@ -89,6 +89,19 @@ template <> struct adl_serializer<glm::mat4>
                         j.at(12).get<float>(), j.at(13).get<float>(), j.at(14).get<float>(), j.at(15).get<float>());
     }
 };
+template <> struct adl_serializer<TextureSize>
+{
+    static void to_json(json &j, const TextureSize &size)
+    {
+        j = {size.width, size.height, size.channels};
+    }
+    static void from_json(const json &j, TextureSize &size)
+    {
+        size.width = j.at(0).get<uint32_t>();
+        size.height = j.at(1).get<uint32_t>();
+        size.channels = j.at(2).get<uint32_t>();
+    }
+};
 // settings
 template <> struct adl_serializer<MAssetSetting>
 {
@@ -350,14 +363,16 @@ template <> struct adl_serializer<MTexture>
     static void to_json(json &j, const MTexture &asset)
     {
         j = static_cast<const MAsset &>(asset);
-        j["data"] = asset.mImageData;
+        j["data"] = json::binary(asset.mImageData);
+        j["size"] = asset.mSize;
         j["setting"] = asset.mSetting;
     }
     static void from_json(const json &j, MTexture &asset)
     {
         j.get_to<MAsset>(asset);
-        asset.mImageData = j["data"].get<std::vector<uint8_t>>();
+        asset.mImageData = j["data"].get_binary();
         asset.mSetting = j["setting"].get<MTextureSetting>();
+        asset.mSize = j.at("size").get<TextureSize>();
     }
 };
 template <> struct adl_serializer<MPipeline>

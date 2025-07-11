@@ -99,6 +99,10 @@ class MTexture final : public MAsset
     {
         return mSize;
     }
+    inline void SetSize(const TextureSize &size)
+    {
+        mSize = size;
+    }
     inline const vk::Image &GetImage() const
     {
         return mImage;

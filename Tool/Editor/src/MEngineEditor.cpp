@@ -1345,6 +1345,11 @@ bool MEngineEditor::ReflectObject(entt::meta_any &instance, entt::meta_type type
                     auto value = fieldValue.cast<vk::DescriptorSet>();
                     ImGui::Image(reinterpret_cast<ImTextureID>(static_cast<VkDescriptorSet>(value)), ImVec2(100, 100));
                 }
+                else if (fieldType == entt::resolve<TextureSize>())
+                {
+                    auto value = fieldValue.cast<TextureSize>();
+                    ImGui::Text("%s: %dx%dx%d", fieldName, value.width, value.height, value.channels);
+                }
                 else
                 {
                     ImGui::Text("%s: %s", fieldName, fieldType.info().name().data());

@@ -97,14 +97,13 @@ std::shared_ptr<MAsset> AssetDatabase::LoadAsset(const std::filesystem::path &pa
         LogError("Asset file {} does not exist.", path.string());
         return nullptr;
     }
-    std::ifstream file(path);
+    std::ifstream file(path, std::ios::binary);
     if (!file.is_open())
     {
         LogError("Failed to open asset file {}.", path.string());
         return nullptr;
     }
-    json j;
-    file >> j;
+    json j = json::from_msgpack(file);
     file.close();
     auto assetTypeStr = j["type"].get<std::string>();
     auto assetType = magic_enum::enum_cast<Core::Asset::MAssetType>(assetTypeStr).value();
