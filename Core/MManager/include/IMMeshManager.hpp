@@ -12,7 +12,8 @@ enum class DefaultMeshType
     Cube,
     Sphere,
     Plane,
-    Cylinder
+    Cylinder,
+    Sky,
 };
 class IMMeshManager : public virtual IMManager<MMesh>
 {
@@ -25,6 +26,7 @@ class IMMeshManager : public virtual IMManager<MMesh>
     virtual std::shared_ptr<MMesh> CreateSphereMesh() = 0;
     virtual std::shared_ptr<MMesh> CreatePlaneMesh() = 0;
     virtual std::shared_ptr<MMesh> CreateCylinderMesh() = 0;
+    virtual std::shared_ptr<MMesh> CreateSkyMesh() = 0;
     virtual std::shared_ptr<MMesh> GetMesh(DefaultMeshType type) const = 0;
 };
 } // namespace MEngine::Core::Manager

@@ -89,6 +89,7 @@ void MRenderSystem::Update(float deltaTime)
     Batch();
     Prepare();
     RenderForwardCompositePass();
+    RenderSkyPass();
     End();
     mCurrentFrameIndex = (mCurrentFrameIndex + 1) % mFrameCount;
 }
@@ -218,26 +219,9 @@ void MRenderSystem::Prepare()
     beginInfo.setFlags(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
     commandBuffer.begin(beginInfo);
     WriteGlobalDescriptorSet(mCurrentFrameIndex);
-}
-void MRenderSystem::RenderForwardCompositePass()
-{
-    auto commandBuffer = mGraphicsCommandBuffers[mCurrentFrameIndex].get();
     auto extent = mRenderTargets[mCurrentFrameIndex].GetExtent();
-    auto framebuffer = mFramebuffers[mCurrentFrameIndex].get();
-    auto renderPassType = RenderPassType::ForwardComposition;
-    auto &&[renderPass, subpass] = mRenderPassManager->GetRenderPass(renderPassType);
-    auto globalDescriptorSet = mGlobalDescriptorSets[mCurrentFrameIndex].get();
-
-    vk::RenderPassBeginInfo renderPassBeginInfo;
-    auto clearValues = RenderTarget::GetClearValues();
     auto width = extent.width;
     auto height = extent.height;
-    renderPassBeginInfo.setRenderPass(renderPass)
-        .setFramebuffer(framebuffer)
-        .setRenderArea({{0, 0}, {width, height}})
-        .setClearValues(clearValues);
-
-    commandBuffer.beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
     vk::Viewport viewport;
     viewport.setX(0.0f)
         .setY(height)
@@ -249,7 +233,22 @@ void MRenderSystem::RenderForwardCompositePass()
     vk::Rect2D scissor;
     scissor.setOffset({0, 0}).setExtent({width, height});
     commandBuffer.setScissor(0, {scissor});
-    for (const auto &[pipeline, entities] : mRenderQueue[renderPassType])
+
+    auto renderPass = mRenderPassManager->GetCompositionRenderPass();
+    auto framebuffer = mFramebuffers[mCurrentFrameIndex].get();
+    vk::RenderPassBeginInfo renderPassBeginInfo;
+    auto clearValues = RenderTarget::GetClearValues();
+    renderPassBeginInfo.setRenderPass(renderPass)
+        .setFramebuffer(framebuffer)
+        .setRenderArea({{0, 0}, {width, height}})
+        .setClearValues(clearValues);
+    commandBuffer.beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
+}
+void MRenderSystem::RenderForwardCompositePass()
+{
+    auto commandBuffer = mGraphicsCommandBuffers[mCurrentFrameIndex].get();
+    auto globalDescriptorSet = mGlobalDescriptorSets[mCurrentFrameIndex].get();
+    for (const auto &[pipeline, entities] : mRenderQueue[RenderPassType::ForwardComposition])
     {
         commandBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline->GetPipeline());
         for (auto entity : entities)
@@ -280,7 +279,28 @@ void MRenderSystem::RenderForwardCompositePass()
         }
     }
     // commandBuffer.nextSubpass(vk::SubpassContents::eInline);
-    commandBuffer.endRenderPass();
+    commandBuffer.nextSubpass(vk::SubpassContents::eInline);
+}
+void MRenderSystem::RenderSkyPass()
+{
+    auto commandBuffer = mGraphicsCommandBuffers[mCurrentFrameIndex].get();
+    auto globalDescriptorSet = mGlobalDescriptorSets[mCurrentFrameIndex].get();
+    // 绑定天空盒管线
+    auto pipeline = mPipelineManager->GetByName(PipelineType::Sky);
+    commandBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline->GetPipeline());
+
+    // 绑定全局描述符集
+    commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipeline->GetPipelineLayout(), 0,
+                                     globalDescriptorSet, {});
+    // 绑定天空盒网格
+    auto skyMesh = mResourceManager->GetManager<MMesh, IMMeshManager>()->GetMesh(DefaultMeshType::Sky);
+    auto vertexBuffer = skyMesh->GetVertexBuffer();
+    commandBuffer.bindVertexBuffers(0, vertexBuffer, {0});
+    // 绑定索引缓冲区
+    auto indexBuffer = skyMesh->GetIndexBuffer();
+    commandBuffer.bindIndexBuffer(indexBuffer, 0, vk::IndexType::eUint32);
+    // 绘制天空盒
+    commandBuffer.drawIndexed(skyMesh->GetIndexCount(), 1, 0, 0, 0);
 }
 void MRenderSystem::End()
 {
@@ -288,6 +308,7 @@ void MRenderSystem::End()
     auto fence = mInFlightFences[mCurrentFrameIndex].get();
     auto signalSemaphore = mRenderFinishedSemaphores[mCurrentFrameIndex].get();
     auto waitSemaphore = mImageAvailableSemaphores[mCurrentFrameIndex];
+    commandBuffer.endRenderPass();
     commandBuffer.end();
     vk::SubmitInfo submitInfo;
     vk::PipelineStageFlags waitStage = vk::PipelineStageFlagBits::eColorAttachmentOutput;

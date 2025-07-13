@@ -163,7 +163,7 @@ void main()
     vec4 finalColor = vec4(0.0, 0.0, 0.0, 1.0);
     int lightCount = 0;
     vec3 F0 = mix(vec3(0.04), albedoColor, metallic);
-    vec3 N = normalize(fragViewNormal);
+    vec3 N = normalize(normalColor * 2.0 - 1.0);
     vec3 VIEW = -fragViewPosition; // 相机空间
     vec3 V = normalize(VIEW);
     float NoV = clamp(dot(N, V), 0, 1.0f);
@@ -209,8 +209,8 @@ void main()
     float maxMipLevel = log2(textureSize(environmentMap, 0).x);
     float lod = roughness * maxMipLevel;
     vec2 uv = DirectionToUV(normalize(fragViewNormal));
-    vec3 environmentRadiance = textureLod(environmentMap, uv, lod).rgb;
-    vec3 irradiance = texture(irradianceMap, uv).rgb;
+    vec3 environmentRadiance = pow(textureLod(environmentMap, uv, lod).rgb, vec3(2.2));
+    vec3 irradiance = pow(texture(irradianceMap, uv).rgb, vec3(2.2));
     vec3 brdf = texture(brdfLUT, vec2(NoV, roughness)).rgb;
     vec3 kS = F0;
     vec3 kD = 1.0 - kS;

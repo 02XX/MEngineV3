@@ -21,6 +21,7 @@ struct PipelineType
 {
     static constexpr const char *ForwardOpaquePBR = "ForwardOpaquePBR";
     static constexpr const char *ForwardTransparentPBR = "ForwardTransparentPBR";
+    static constexpr const char *Sky = "Sky";
 };
 enum class RenderPassType
 {

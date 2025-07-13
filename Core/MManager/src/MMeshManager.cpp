@@ -2,8 +2,10 @@
 #include "IMMeshManager.hpp"
 #include "Logger.hpp"
 #include "VMA.hpp"
+#include "Vertex.hpp"
 #include <cstring>
 #include <glm/ext/scalar_constants.hpp>
+#include <vector>
 
 namespace MEngine::Core::Manager
 {
@@ -138,19 +140,23 @@ void MMeshManager::CreateDefault()
     auto sphereMesh = CreateSphereMesh();
     auto planeMesh = CreatePlaneMesh();
     auto cylinderMesh = CreateCylinderMesh();
+    auto skyMesh = CreateSkyMesh();
     Remove(cubeMesh->mID);
     Remove(sphereMesh->mID);
     Remove(planeMesh->mID);
     Remove(cylinderMesh->mID);
+    Remove(skyMesh->mID);
     cubeMesh->mID = mDefaultMeshes[DefaultMeshType::Cube];
     sphereMesh->mID = mDefaultMeshes[DefaultMeshType::Sphere];
     planeMesh->mID = mDefaultMeshes[DefaultMeshType::Plane];
     cylinderMesh->mID = mDefaultMeshes[DefaultMeshType::Cylinder];
+    skyMesh->mID = mDefaultMeshes[DefaultMeshType::Sky];
 
     mAssets[mDefaultMeshes[DefaultMeshType::Cube]] = cubeMesh;
     mAssets[mDefaultMeshes[DefaultMeshType::Sphere]] = sphereMesh;
     mAssets[mDefaultMeshes[DefaultMeshType::Plane]] = planeMesh;
     mAssets[mDefaultMeshes[DefaultMeshType::Cylinder]] = cylinderMesh;
+    mAssets[mDefaultMeshes[DefaultMeshType::Sky]] = skyMesh;
 }
 std::shared_ptr<MMesh> MMeshManager::CreateCubeMesh()
 {
@@ -437,5 +443,39 @@ std::shared_ptr<MMesh> MMeshManager::GetMesh(DefaultMeshType type) const
     }
     LogError("Default mesh type {} not found", static_cast<int>(type));
     return nullptr;
+}
+std::shared_ptr<MMesh> MMeshManager::CreateSkyMesh()
+{
+    const std::vector<Vertex> vertices = {
+        // 前面
+        {{-1.0f, -1.0f, 1.0f}, {}, {}},
+        {{1.0f, -1.0f, 1.0f}, {}, {}},
+        {{1.0f, 1.0f, 1.0f}, {}, {}},
+        {{-1.0f, 1.0f, 1.0f}, {}, {}},
+        // 后面
+        {{-1.0f, -1.0f, -1.0f}, {}, {}},
+        {{1.0f, -1.0f, -1.0f}, {}, {}},
+        {{1.0f, 1.0f, -1.0f}, {}, {}},
+        {{-1.0f, 1.0f, -1.0f}, {}, {}},
+    };
+
+    const std::vector<uint32_t> indices = {// 前面
+                                           2, 1, 0, 0, 3, 2,
+                                           // 右面
+                                           6, 5, 1, 1, 2, 6,
+                                           // 后面
+                                           7, 4, 5, 5, 6, 7,
+                                           // 左面
+                                           3, 0, 4, 4, 7, 3,
+                                           // 顶面
+                                           6, 2, 3, 3, 7, 6,
+                                           // 底面
+                                           1, 5, 4, 4, 0, 1};
+
+    auto meshSetting = MMeshSetting{};
+    auto mesh = Create("Sky Mesh", vertices, indices, meshSetting);
+    CreateVulkanResources(mesh);
+    Write(mesh);
+    return mesh;
 }
 }; // namespace MEngine::Core::Manager

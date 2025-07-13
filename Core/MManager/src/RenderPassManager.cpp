@@ -42,12 +42,33 @@ void RenderPassManager::CreateCompositionRenderPass()
         .setPDepthStencilAttachment(&depthRef);
     mSubPasses[RenderPassType::ForwardComposition] = 0; // SubPass 0
 
-    // SubPass 1
+    // SubPass 1: Sky RenderPass
+    std::vector<vk::AttachmentReference> environmentColorRefs{
+        vk::AttachmentReference(0, vk::ImageLayout::eColorAttachmentOptimal), // Render Target: Color
+    };
+    vk::SubpassDescription environmentSubpass{};
+    environmentSubpass.setPipelineBindPoint(vk::PipelineBindPoint::eGraphics)
+        .setColorAttachments(environmentColorRefs)
+        .setPDepthStencilAttachment(&depthRef);
+    mSubPasses[RenderPassType::Sky] = 1; // SubPass 1
+
     std::vector<vk::SubpassDescription> subpasses{
         forwardCompositionSubpass,
+        environmentSubpass,
+    };
+    // subpass dependencies
+    std::vector<vk::SubpassDependency> dependencies{
+        // Subpass 0 -> Subpass 1
+        vk::SubpassDependency()
+            .setSrcSubpass(0)
+            .setDstSubpass(1)
+            .setSrcStageMask(vk::PipelineStageFlagBits::eColorAttachmentOutput)
+            .setDstStageMask(vk::PipelineStageFlagBits::eFragmentShader)
+            .setSrcAccessMask(vk::AccessFlagBits::eColorAttachmentWrite)
+            .setDstAccessMask(vk::AccessFlagBits::eShaderRead),
     };
     vk::RenderPassCreateInfo renderPassCreateInfo{};
-    renderPassCreateInfo.setAttachments(attachments).setSubpasses(subpasses);
+    renderPassCreateInfo.setAttachments(attachments).setSubpasses(subpasses).setDependencies(dependencies);
     auto renderPass = mVulkanContext->GetDevice().createRenderPassUnique(renderPassCreateInfo);
     if (!renderPass)
     {

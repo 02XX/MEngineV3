@@ -23,7 +23,9 @@ class MMeshManager final : public MManager<MMesh>, public IMMeshManager
         {DefaultMeshType::Cube, UUID{"00000000-0000-0000-0000-000000000001"}},
         {DefaultMeshType::Cylinder, UUID{"00000000-0000-0000-0000-000000000002"}},
         {DefaultMeshType::Plane, UUID{"00000000-0000-0000-0000-000000000003"}},
-        {DefaultMeshType::Sphere, UUID{"00000000-0000-0000-0000-000000000004"}}};
+        {DefaultMeshType::Sphere, UUID{"00000000-0000-0000-0000-000000000004"}},
+        {DefaultMeshType::Sky, UUID{"00000000-0000-0000-0000-000000000005"}},
+    };
 
   public:
     MMeshManager(std::shared_ptr<VulkanContext> vulkanContext, std::shared_ptr<IUUIDGenerator> uuidGenerator);
@@ -38,6 +40,7 @@ class MMeshManager final : public MManager<MMesh>, public IMMeshManager
     std::shared_ptr<MMesh> CreateSphereMesh() override;
     std::shared_ptr<MMesh> CreatePlaneMesh() override;
     std::shared_ptr<MMesh> CreateCylinderMesh() override;
+    std::shared_ptr<MMesh> CreateSkyMesh() override;
     std::shared_ptr<MMesh> GetMesh(DefaultMeshType type) const override;
 };
 } // namespace MEngine::Core::Manager

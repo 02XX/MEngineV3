@@ -165,6 +165,7 @@ class MRenderSystem final : public MSystem
     void Batch();
     void Prepare();
     void RenderForwardCompositePass();
+    void RenderSkyPass();
     void End();
     void WriteGlobalDescriptorSet(uint32_t globalDescriptorSetIndex);
     // void RenderPostProcessPass();

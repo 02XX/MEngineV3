@@ -266,6 +266,23 @@ void MPipelineManager::CreateDefault()
     pbrSetting.MaterialDescriptorSetLayoutBindings = mDescriptorSetLayoutBindings;
     auto pbrPipeline = Create(PipelineType::ForwardOpaquePBR, pbrSetting);
     CreateVulkanResources(pbrPipeline);
+    // Sky
+    mDescriptorSetLayoutBindings = {
+        // Binding: 0 Environment Map
+        vk::DescriptorSetLayoutBinding{0, vk::DescriptorType::eCombinedImageSampler, 1,
+                                       vk::ShaderStageFlagBits::eFragment},
+        // Binding: 1 Irradiance Map
+        vk::DescriptorSetLayoutBinding{1, vk::DescriptorType::eCombinedImageSampler, 1,
+                                       vk::ShaderStageFlagBits::eFragment},
+    };
+    auto skySetting = MPipelineSetting{};
+    skySetting.VertexShaderPath = "Engine/Shaders/Sky.vert";
+    skySetting.FragmentShaderPath = "Engine/Shaders/Sky.frag";
+    skySetting.RenderPassType = RenderPassType::Sky;
+    skySetting.DepthWriteEnable = false;
+    skySetting.MaterialDescriptorSetLayoutBindings = mDescriptorSetLayoutBindings;
+    auto skyPipeline = Create(PipelineType::Sky, skySetting);
+    CreateVulkanResources(skyPipeline);
 }
 
 } // namespace MEngine::Core::Manager
