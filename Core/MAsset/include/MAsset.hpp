@@ -38,7 +38,6 @@ class MAsset
   protected:
     UUID mID{};
     std::string mName{"Unnamed"};
-    std::filesystem::path mPath{};
     MAssetState mState = MAssetState::Unloaded;
     MAssetType mType = MAssetType::Unknown;
 
@@ -70,14 +69,6 @@ class MAsset
     virtual inline void SetType(MAssetType type)
     {
         mType = type;
-    }
-    virtual inline const std::filesystem::path &GetPath() const
-    {
-        return mPath;
-    }
-    virtual inline void SetPath(const std::filesystem::path &path)
-    {
-        mPath = path;
     }
     virtual inline const std::string &GetName() const
     {

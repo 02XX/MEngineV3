@@ -34,12 +34,6 @@ static void RegisterAsset()
             .Editable = true,
             .Serializable = true,
         })
-        .data<&MAsset::SetPath, &MAsset::GetPath>("Path"_hs)
-        .custom<Info>(Info{
-            .DisplayName = "Asset Path",
-            .Editable = false,
-            .Serializable = true,
-        })
         .data<&MAsset::SetName, &MAsset::GetName>("Name"_hs)
         .custom<Info>(Info{
             .DisplayName = "Asset Name",

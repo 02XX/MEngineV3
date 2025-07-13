@@ -260,8 +260,8 @@ void MPipelineManager::CreateDefault()
         vk::DescriptorSetLayoutBinding{4, vk::DescriptorType::eCombinedImageSampler, 1,
                                        vk::ShaderStageFlagBits::eFragment}};
     auto pbrSetting = MPipelineSetting{};
-    pbrSetting.VertexShaderPath = "Assets/Shaders/ForwardOpaquePBR.vert";
-    pbrSetting.FragmentShaderPath = "Assets/Shaders/ForwardOpaquePBR.frag";
+    pbrSetting.VertexShaderPath = "Engine/Shaders/ForwardOpaquePBR.vert";
+    pbrSetting.FragmentShaderPath = "Engine/Shaders/ForwardOpaquePBR.frag";
     pbrSetting.RenderPassType = RenderPassType::ForwardComposition;
     pbrSetting.MaterialDescriptorSetLayoutBindings = mDescriptorSetLayoutBindings;
     auto pbrPipeline = Create(PipelineType::ForwardOpaquePBR, pbrSetting);

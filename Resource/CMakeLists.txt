@@ -6,16 +6,16 @@ add_library(MResource ${RESOURCE})
 target_include_directories(MResource PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_link_libraries(MResource PUBLIC Core)
 target_link_libraries(MResource PRIVATE assimp::assimp)
-#Assets
+#Engine
 add_custom_target(
-    Assets
+    Engine
     ALL
     COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/bin/Assets
-    COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/Assets ${CMAKE_BINARY_DIR}/bin/Assets
+    COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/Engine ${CMAKE_BINARY_DIR}/bin/Engine
     COMMENT "Copying assets files from source_folder to destination_folder..."
     VERBATIM
 )
-add_dependencies(MResource Assets)
+add_dependencies(MResource Engine)
 add_custom_target(
     ProjectD
     ALL

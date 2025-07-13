@@ -209,7 +209,7 @@ void MEngineEditor::InitImGui()
     }
     // 设置字体
     ImFontConfig fontConfig{};
-    auto notoSansFont = io.Fonts->AddFontFromFileTTF("Assets/Fonts/MSYH.TTC", 18.0f, &fontConfig,
+    auto notoSansFont = io.Fonts->AddFontFromFileTTF("Engine/Fonts/MSYH.TTC", 18.0f, &fontConfig,
                                                      io.Fonts->GetGlyphRangesChineseFull());
     if (!notoSansFont)
     {
@@ -234,15 +234,15 @@ void MEngineEditor::InitImGui()
             mAssetIconTextures[type]->GetSampler(), mAssetIconTextures[type]->GetImageView(),
             static_cast<VkImageLayout>(vk::ImageLayout::eShaderReadOnlyOptimal));
     };
-    loadIcon("Assets/Icons/folder.png", MAssetType::Folder);
-    loadIcon("Assets/Icons/texture.png", MAssetType::Texture);
-    loadIcon("Assets/Icons/material.png", MAssetType::Material);
-    loadIcon("Assets/Icons/model.png", MAssetType::Model);
-    loadIcon("Assets/Icons/shader.png", MAssetType::Shader);
-    loadIcon("Assets/Icons/file.png", MAssetType::File);
-    loadIcon("Assets/Icons/audio.png", MAssetType::Audio);
-    loadIcon("Assets/Icons/animation.png", MAssetType::Animation);
-    loadIcon("Assets/Icons/script.png", MAssetType::Script);
+    loadIcon("Engine/Icons/folder.png", MAssetType::Folder);
+    loadIcon("Engine/Icons/texture.png", MAssetType::Texture);
+    loadIcon("Engine/Icons/material.png", MAssetType::Material);
+    loadIcon("Engine/Icons/model.png", MAssetType::Model);
+    loadIcon("Engine/Icons/shader.png", MAssetType::Shader);
+    loadIcon("Engine/Icons/file.png", MAssetType::File);
+    loadIcon("Engine/Icons/audio.png", MAssetType::Audio);
+    loadIcon("Engine/Icons/animation.png", MAssetType::Animation);
+    loadIcon("Engine/Icons/script.png", MAssetType::Script);
 
     ImGuizmo::SetImGuiContext(ImGui::GetCurrentContext());
     ImGuizmo::Enable(true);
@@ -253,6 +253,7 @@ void MEngineEditor::InitDataBase()
     mAssetDatabase = injector.create<std::shared_ptr<AssetDatabase>>();
     mRootFolder = mAssetDatabase->LoadDatabase(mProjectPath);
     mCurrentFolder = mRootFolder;
+    mCurrentPath = mAssetDatabase->GetPath(mCurrentFolder->GetID());
 }
 void MEngineEditor::InitEditorCamera()
 {
@@ -1079,7 +1080,8 @@ void MEngineEditor::RenderInspectorPanel()
                             auto pbrMaterialManager = injector.create<std::shared_ptr<MPBRMaterialManager>>();
                             pbrMaterialManager->Update(pbrMaterial);
                             pbrMaterialManager->Write(pbrMaterial);
-                            mAssetDatabase->SaveAsset(pbrMaterial);
+                            auto path = mAssetDatabase->GetPath(pbrMaterial->GetID());
+                            mAssetDatabase->SaveAsset(pbrMaterial, path);
                         }
                         break;
                     }
@@ -1107,12 +1109,13 @@ void MEngineEditor::RenderAssetPanel()
         if (mCurrentFolder->GetParentFolder() != nullptr)
         {
             mCurrentFolder = mCurrentFolder->GetParentFolder();
+            mCurrentPath = mAssetDatabase->GetPath(mCurrentFolder->GetID());
             mSelectedAsset = nullptr;
             mHoveredAsset = nullptr;
         }
     }
     ImGui::SameLine();
-    ImGui::TextUnformatted(mCurrentFolder->GetPath().string().c_str());
+    ImGui::TextUnformatted(mCurrentPath.string().c_str());
 
     // ==== 右侧操作区（Refresh按钮 + Columns滑动条） ====
     // -- 计算所有右侧控件总宽度（包括空隙） --
@@ -1164,6 +1167,7 @@ void MEngineEditor::RenderAssetPanel()
                         if (asset->GetType() == MAssetType::Folder)
                         {
                             mCurrentFolder = std::static_pointer_cast<MFolder>(asset);
+                            mCurrentPath = mAssetDatabase->GetPath(mCurrentFolder->GetID());
                         }
                     }
                 }
@@ -1199,13 +1203,13 @@ void MEngineEditor::RenderAssetPanel()
                 ImGui::SetCursorScreenPos(imagePos);
                 // 根据资源类型选择图标
                 ImGui::Image(reinterpret_cast<ImTextureID>(mAssetIcons[asset->GetType()]), iconSize);
-                auto textSize = ImGui::CalcTextSize(asset->GetPath().filename().stem().string().c_str());
+                auto textSize = ImGui::CalcTextSize(asset->GetName().c_str());
                 auto textOffset = ImVec2((selectableRectSize.x - textSize.x) * 0.5f, iconSize.y);
                 auto textPos = ImVec2(selectableRectMin.x + textOffset.x, selectableRectMin.y + textOffset.y);
                 ImGui::SetCursorScreenPos(textPos);
                 float textHeight = ImGui::GetFontSize();
                 // ImGui::SetWindowFontScale(10.0f/mColumns ); // 根据列数调整字体大小
-                ImGui::Text("%s", asset->GetPath().filename().stem().string().c_str());
+                ImGui::Text("%s", asset->GetName().c_str());
                 // ImGui::SetWindowFontScale(1.0f);
             }
             ImGui::EndGroup();
@@ -1226,36 +1230,31 @@ void MEngineEditor::RenderAssetPanel()
             if (ImGui::MenuItem("New Folder"))
             {
                 auto folderManager = injector.create<std::shared_ptr<MFolderManager>>();
-                auto newDirectory = mAssetDatabase->GenerateUniqueAssetPath(mCurrentFolder->GetPath() / "New Folder");
+                auto newDirectory = mAssetDatabase->GenerateUniqueAssetPath(mCurrentPath / "New Folder");
                 auto folder = folderManager->Create(newDirectory.filename().stem().string(), {});
-                folder->SetPath(newDirectory);
-                mAssetDatabase->SaveFolder(folder);
+                mAssetDatabase->SaveAsset(folder, newDirectory);
             }
             if (ImGui::MenuItem("New Texture"))
             {
                 auto textureManager = injector.create<std::shared_ptr<MTextureManager>>();
                 auto textureSetting = MTextureSetting{};
                 auto texture = textureManager->Create("New Texture", {800, 600, 4}, {}, textureSetting);
-                auto savePath =
-                    mAssetDatabase->GenerateUniqueAssetPath(mCurrentFolder->GetPath() / "New Texture.masset");
-                texture->SetPath(savePath);
+                auto savePath = mAssetDatabase->GenerateUniqueAssetPath(mCurrentPath / "New Texture.masset");
                 textureManager->Update(texture);
                 textureManager->CreateVulkanResources(texture);
-                mAssetDatabase->SaveAsset(texture);
+                mAssetDatabase->SaveAsset(texture, savePath);
             }
             if (ImGui::MenuItem("New Pipeline"))
             {
                 auto pipelineManager = injector.create<std::shared_ptr<MPipelineManager>>();
                 auto pipelineSetting = MPipelineSetting{};
-                pipelineSetting.VertexShaderPath = "Assets/Shaders/ForwardOpaquePBR.vert";
-                pipelineSetting.FragmentShaderPath = "Assets/Shaders/ForwardOpaquePBR.frag";
+                pipelineSetting.VertexShaderPath = "Engine/Shaders/ForwardOpaquePBR.vert";
+                pipelineSetting.FragmentShaderPath = "Engine/Shaders/ForwardOpaquePBR.frag";
                 auto pipeline = pipelineManager->Create("New Pipeline", pipelineSetting);
-                auto savePath =
-                    mAssetDatabase->GenerateUniqueAssetPath(mCurrentFolder->GetPath() / "New Pipeline.masset");
-                pipeline->SetPath(savePath);
+                auto savePath = mAssetDatabase->GenerateUniqueAssetPath(mCurrentPath / "New Pipeline.masset");
                 pipelineManager->Update(pipeline);
                 pipelineManager->CreateVulkanResources(pipeline);
-                mAssetDatabase->SaveAsset(pipeline);
+                mAssetDatabase->SaveAsset(pipeline, savePath);
             }
             if (ImGui::BeginMenu("New Material"))
             {
@@ -1263,8 +1262,7 @@ void MEngineEditor::RenderAssetPanel()
                 {
                     auto pbrMaterialManager = injector.create<std::shared_ptr<MPBRMaterialManager>>();
                     auto textureManager = injector.create<std::shared_ptr<MTextureManager>>();
-                    auto savePath =
-                        mAssetDatabase->GenerateUniqueAssetPath(mCurrentFolder->GetPath() / "New PBR Material.masset");
+                    auto savePath = mAssetDatabase->GenerateUniqueAssetPath(mCurrentPath / "New PBR Material.masset");
                     auto pbrMaterialProperties = MPBRMaterialProperties{};
                     auto pbrTextures = MPBRTextures{};
                     pbrTextures.AlbedoID = textureManager->GetDefaultTexture(DefaultTextureType::Albedo)->GetID();
@@ -1275,11 +1273,10 @@ void MEngineEditor::RenderAssetPanel()
                     auto pbrMaterial =
                         pbrMaterialManager->Create(savePath.filename().stem().string(), PipelineType::ForwardOpaquePBR,
                                                    pbrMaterialProperties, pbrTextures, pbrMaterialSetting);
-                    pbrMaterial->SetPath(savePath);
                     pbrMaterialManager->Update(pbrMaterial);
                     pbrMaterialManager->CreateVulkanResources(pbrMaterial);
                     pbrMaterialManager->Write(pbrMaterial);
-                    mAssetDatabase->SaveAsset(pbrMaterial);
+                    mAssetDatabase->SaveAsset(pbrMaterial, savePath);
                 }
                 ImGui::EndMenu();
             }
@@ -1303,10 +1300,9 @@ void MEngineEditor::RenderAssetPanel()
                 {
                     auto model =
                         Function::Utils::EntityUtils::GetModelFromEntity(resourceManager, registry, draggedEntity);
-                    auto savePath = mAssetDatabase->GenerateUniqueAssetPath(mCurrentFolder->GetPath() /
-                                                                            (model->GetName() + ".masset"));
-                    model->SetPath(savePath);
-                    mAssetDatabase->SaveAsset<MModel>(model);
+                    auto savePath =
+                        mAssetDatabase->GenerateUniqueAssetPath(mCurrentPath / (model->GetName() + ".masset"));
+                    mAssetDatabase->SaveAsset<MModel>(model, savePath);
                 }
             }
             ImGui::PopStyleColor(3);
@@ -1658,16 +1654,14 @@ void MEngineEditor::SetGLFWCallBacks()
             if (extension == ".fbx")
             {
                 auto model = assetDatabase->LoadFBX(path);
-                auto savePath = assetDatabase->GenerateUniqueAssetPath(instance->mCurrentFolder->GetPath() / fileName);
-                model->SetPath(savePath);
-                assetDatabase->SaveAsset(model);
+                auto savePath = assetDatabase->GenerateUniqueAssetPath(instance->mCurrentPath / fileName);
+                assetDatabase->SaveAsset(model, savePath);
             }
             else if (extension == ".png" || extension == ".jpg" || extension == ".jpeg")
             {
                 auto texture = assetDatabase->LoadPNG(path);
-                auto savePath = assetDatabase->GenerateUniqueAssetPath(instance->mCurrentFolder->GetPath() / fileName);
-                texture->SetPath(savePath);
-                assetDatabase->SaveAsset(texture);
+                auto savePath = assetDatabase->GenerateUniqueAssetPath(instance->mCurrentPath / fileName);
+                assetDatabase->SaveAsset(texture, savePath);
             }
         }
     });

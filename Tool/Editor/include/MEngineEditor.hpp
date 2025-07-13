@@ -102,6 +102,7 @@ class MEngineEditor
     vk::UniqueRenderPass mUIRenderPass;
     std::shared_ptr<MFolder> mRootFolder{};
     std::shared_ptr<MFolder> mCurrentFolder{};
+    std::filesystem::path mCurrentPath{};
     void InitWindow();
     void InitVulkan();
     void InitImGui();

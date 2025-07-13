@@ -29,6 +29,7 @@ class AssetDatabase
 
   private:
     std::unordered_map<std::filesystem::path, UUID> mPath2UUID;
+    std::unordered_map<UUID, std::filesystem::path> mUUID2Path;
 
   public:
     AssetDatabase(std::shared_ptr<ResourceManager> resourceManager) : mResourceManager(resourceManager)
@@ -52,36 +53,46 @@ class AssetDatabase
     void DeleteAsset(const std::filesystem::path &path);
 
     //  持久化
+    inline const std::filesystem::path &GetPath(const UUID &id) const
+    {
+        if (mUUID2Path.contains(id))
+        {
+            return mUUID2Path.at(id);
+        }
+        LogWarn("UUID {} not found in AssetDatabase.", id.ToString());
+        static std::filesystem::path emptyPath{};
+        return emptyPath;
+    }
     std::shared_ptr<MAsset> LoadAsset(const std::filesystem::path &path);
     template <std::derived_from<MAsset> TAsset> std::shared_ptr<TAsset> LoadAsset(const std::filesystem::path &path)
     {
         auto asset = LoadAsset(path);
         return std::static_pointer_cast<TAsset>(asset);
     }
-    template <std::derived_from<MAsset> TAsset> void SaveAsset(std::shared_ptr<TAsset> asset)
+    template <std::derived_from<MAsset> TAsset>
+    void SaveAsset(std::shared_ptr<TAsset> asset, const std::filesystem::path &savePath)
     {
-        if (asset->GetPath().empty())
+        if constexpr (std::is_same_v<TAsset, MFolder>)
         {
-            LogError("Asset path is NOT set. Cannot save asset without a valid path.");
-            throw std::runtime_error("Asset path is empty. Cannot save asset without a valid path.");
+            std::filesystem::create_directories(savePath);
         }
-        if (!asset->GetPath().has_extension() || asset->GetPath().extension() != ".masset")
+        else if (asset->GetType() == MAssetType::Folder)
         {
-            LogError("Asset path {} does not have a valid extension. Expected .masset.", asset->GetPath().string());
-            throw std::runtime_error("Asset path does not have a valid extension. Expected .masset.");
+            std::filesystem::create_directories(savePath);
         }
-        auto savePath = asset->GetPath();
-        std::ofstream file(savePath, std::ios::binary);
-        if (!file.is_open())
+        else
         {
-            throw std::runtime_error("Failed to open asset file for writing: " + savePath.string());
+            std::ofstream file(savePath, std::ios::binary);
+            if (!file.is_open())
+            {
+                throw std::runtime_error("Failed to open asset file for writing: " + savePath.string());
+            }
+            json j = *asset;
+            auto msgPack = json::to_msgpack(j);
+            file.write(reinterpret_cast<const char *>(msgPack.data()), msgPack.size());
+            file.close();
         }
-        asset->SetPath(savePath);
         asset->SetName(savePath.filename().stem().string());
-        json j = *asset;
-        auto msgPack = json::to_msgpack(j);
-        file.write(reinterpret_cast<const char *>(msgPack.data()), msgPack.size());
-        file.close();
         auto folderManager = mResourceManager->GetManager<MFolder, IMFolderManager>();
         auto parentFolder = folderManager->Get(mPath2UUID[savePath.parent_path()]);
         if (parentFolder != nullptr)
@@ -91,11 +102,9 @@ class AssetDatabase
                 parentFolder->AddChild(asset);
             }
         }
-        mPath2UUID[asset->GetPath()] = asset->GetID();
+        mPath2UUID[savePath] = asset->GetID();
+        mUUID2Path[asset->GetID()] = savePath;
     }
-    void DeleteFolder(const std::filesystem::path &directory);
-    std::shared_ptr<MFolder> LoadFolder(const std::filesystem::path &directory);
-    void SaveFolder(std::shared_ptr<MFolder> folder);
     // Operations
     std::filesystem::path GenerateUniqueAssetPath(std::filesystem::path path);
 
