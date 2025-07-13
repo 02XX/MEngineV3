@@ -17,7 +17,10 @@ enum class DefaultTextureType
     Normal,
     Emissive,
     Albedo,
-    ARM
+    ARM,
+    EnvironmentMap,
+    IrradianceMap,
+    BRDFLUT
 };
 class IMTextureManager : public virtual IMManager<MTexture>
 {
@@ -33,6 +36,9 @@ class IMTextureManager : public virtual IMManager<MTexture>
     virtual std::shared_ptr<MTexture> CreateEmissiveTexture() = 0;
     virtual std::shared_ptr<MTexture> CreateAlbedoTexture() = 0;
     virtual std::shared_ptr<MTexture> CreateARMTexture() = 0;
+    virtual std::shared_ptr<MTexture> CreateEnvironmentMap() = 0;
+    virtual std::shared_ptr<MTexture> CreateIrradianceMap() = 0;
+    virtual std::shared_ptr<MTexture> CreateBRDFLUT() = 0;
     virtual std::shared_ptr<MTexture> GetDefaultTexture(DefaultTextureType type) const = 0;
     virtual std::shared_ptr<MTexture> CreateColorAttachment(uint32_t width, uint32_t height) = 0;
     virtual std::shared_ptr<MTexture> CreateDepthStencilAttachment(uint32_t width, uint32_t height) = 0;

@@ -20,6 +20,7 @@ void MRenderSystem::Init()
 {
     CreateRenderTarget();
     CreateFramebuffer();
+    CreateEnvironmentMap();
     mImageAvailableSemaphores.resize(mFrameCount);
     mRenderFinishedSemaphores.resize(mFrameCount);
     for (uint32_t i = 0; i < mFrameCount; ++i)
@@ -131,6 +132,13 @@ void MRenderSystem::CreateFramebuffer()
             .setLayers(1);
         mFramebuffers[i] = mVulkanContext->GetDevice().createFramebufferUnique(framebufferCreateInfo);
     }
+}
+void MRenderSystem::CreateEnvironmentMap()
+{
+    auto textureManager = mResourceManager->GetManager<MTexture, IMTextureManager>();
+    mEnvironmentMap = textureManager->GetDefaultTexture(DefaultTextureType::EnvironmentMap);
+    mIrradianceMap = textureManager->GetDefaultTexture(DefaultTextureType::IrradianceMap);
+    mBRDFLUT = textureManager->GetDefaultTexture(DefaultTextureType::BRDFLUT);
 }
 void MRenderSystem::ReSizeFrameBuffer(uint32_t width, uint32_t height)
 {
@@ -313,6 +321,43 @@ void MRenderSystem::WriteGlobalDescriptorSet(uint32_t globalDescriptorSetIndex)
         .setDstBinding(1)
         .setDstArrayElement(0)
         .setDescriptorType(vk::DescriptorType::eUniformBuffer)
+        .setDescriptorCount(1);
+
+    vk::DescriptorImageInfo environmentMapImageInfo;
+    environmentMapImageInfo.setImageView(mEnvironmentMap->GetImageView())
+        .setImageLayout(vk::ImageLayout::eShaderReadOnlyOptimal)
+        .setSampler(mEnvironmentMap->GetSampler())
+        .setImageView(mEnvironmentMap->GetImageView());
+    writeDescriptorSets[2]
+        .setImageInfo(environmentMapImageInfo)
+        .setDstSet(mGlobalDescriptorSets[globalDescriptorSetIndex].get())
+        .setDstBinding(2)
+        .setDstArrayElement(0)
+        .setDescriptorType(vk::DescriptorType::eCombinedImageSampler)
+        .setDescriptorCount(1);
+    vk::DescriptorImageInfo irradianceMapImageInfo;
+    irradianceMapImageInfo.setImageView(mIrradianceMap->GetImageView())
+        .setImageLayout(vk::ImageLayout::eShaderReadOnlyOptimal)
+        .setSampler(mIrradianceMap->GetSampler())
+        .setImageView(mIrradianceMap->GetImageView());
+    writeDescriptorSets[3]
+        .setImageInfo(irradianceMapImageInfo)
+        .setDstSet(mGlobalDescriptorSets[globalDescriptorSetIndex].get())
+        .setDstBinding(3)
+        .setDstArrayElement(0)
+        .setDescriptorType(vk::DescriptorType::eCombinedImageSampler)
+        .setDescriptorCount(1);
+    vk::DescriptorImageInfo brdfLUTImageInfo;
+    brdfLUTImageInfo.setImageView(mBRDFLUT->GetImageView())
+        .setImageLayout(vk::ImageLayout::eShaderReadOnlyOptimal)
+        .setSampler(mBRDFLUT->GetSampler())
+        .setImageView(mBRDFLUT->GetImageView());
+    writeDescriptorSets[4]
+        .setImageInfo(brdfLUTImageInfo)
+        .setDstSet(mGlobalDescriptorSets[globalDescriptorSetIndex].get())
+        .setDstBinding(4)
+        .setDstArrayElement(0)
+        .setDescriptorType(vk::DescriptorType::eCombinedImageSampler)
         .setDescriptorCount(1);
 
     mVulkanContext->GetDevice().updateDescriptorSets(writeDescriptorSets, {});

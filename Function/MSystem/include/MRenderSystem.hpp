@@ -114,6 +114,9 @@ class MRenderSystem final : public MSystem
         alignas(16) glm::vec3 Direction = glm::vec3(0.0f, 0.0f, 1.0f);
     };
     std::array<LightParameters, MAX_LIGHT_COUNT> mLightParameters{};
+    std::shared_ptr<MTexture> mEnvironmentMap;
+    std::shared_ptr<MTexture> mIrradianceMap;
+    std::shared_ptr<MTexture> mBRDFLUT;
 
   public:
     MRenderSystem(std::shared_ptr<VulkanContext> context, std::shared_ptr<entt::registry> registry,
@@ -158,6 +161,7 @@ class MRenderSystem final : public MSystem
     // void RenderShadowPass();
     void CreateRenderTarget();
     void CreateFramebuffer();
+    void CreateEnvironmentMap();
     void Batch();
     void Prepare();
     void RenderForwardCompositePass();

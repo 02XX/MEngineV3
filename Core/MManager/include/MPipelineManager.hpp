@@ -29,6 +29,15 @@ class MPipelineManager final : public MManager<MPipeline>, public IMPipelineMana
         // Binding: 1 Light
         vk::DescriptorSetLayoutBinding{1, vk::DescriptorType::eUniformBuffer, 1,
                                        vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
+        // Binding: 2 Environment Map
+        vk::DescriptorSetLayoutBinding{2, vk::DescriptorType::eCombinedImageSampler, 1,
+                                       vk::ShaderStageFlagBits::eFragment},
+        // Binding: 3 Irradiance Map
+        vk::DescriptorSetLayoutBinding{3, vk::DescriptorType::eCombinedImageSampler, 1,
+                                       vk::ShaderStageFlagBits::eFragment},
+        // Binding: 4 BRDF LUT
+        vk::DescriptorSetLayoutBinding{4, vk::DescriptorType::eCombinedImageSampler, 1,
+                                       vk::ShaderStageFlagBits::eFragment},
     };
     std::unordered_map<std::string, std::vector<vk::DescriptorSetLayoutBinding>> mDescriptorSetLayoutBindings{};
 

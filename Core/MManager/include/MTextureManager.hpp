@@ -25,7 +25,11 @@ class MTextureManager final : public MManager<MTexture>, public IMTextureManager
         {DefaultTextureType::Normal, UUID{"00000000-0000-0000-0000-000000000003"}},
         {DefaultTextureType::Emissive, UUID{"00000000-0000-0000-0000-000000000004"}},
         {DefaultTextureType::Albedo, UUID{"00000000-0000-0000-0000-000000000005"}},
-        {DefaultTextureType::ARM, UUID{"00000000-0000-0000-0000-000000000006"}}};
+        {DefaultTextureType::ARM, UUID{"00000000-0000-0000-0000-000000000006"}},
+        {DefaultTextureType::EnvironmentMap, UUID{"00000000-0000-0000-0000-000000000007"}},
+        {DefaultTextureType::IrradianceMap, UUID{"00000000-0000-0000-0000-000000000008"}},
+        {DefaultTextureType::BRDFLUT, UUID{"00000000-0000-0000-0000-000000000009"}},
+    };
 
   public:
     MTextureManager(std::shared_ptr<VulkanContext> vulkanContext, std::shared_ptr<IUUIDGenerator> uuidGenerator);
@@ -38,6 +42,8 @@ class MTextureManager final : public MManager<MTexture>, public IMTextureManager
     static vk::ImageType TextureTypeToImageType(vk::ImageViewType type);
     static vk::ImageUsageFlags PickImageUsage(const MTextureSetting &setting);
     static vk::ImageCreateFlags PickImageFlags(const MTextureSetting &setting);
+    static std::pair<uint32_t, uint32_t> PickPixelSize(vk::Format format);
+
     static vk::ImageAspectFlags GuessImageAspectFlags(vk::Format format);
     void CreateDefault() override;
     void CreateVulkanResources(std::shared_ptr<MTexture> asset) override;
@@ -48,6 +54,9 @@ class MTextureManager final : public MManager<MTexture>, public IMTextureManager
     std::shared_ptr<MTexture> CreateEmissiveTexture() override;
     std::shared_ptr<MTexture> CreateAlbedoTexture() override;
     std::shared_ptr<MTexture> CreateARMTexture() override;
+    std::shared_ptr<MTexture> CreateEnvironmentMap() override;
+    std::shared_ptr<MTexture> CreateIrradianceMap() override;
+    std::shared_ptr<MTexture> CreateBRDFLUT() override;
     std::shared_ptr<MTexture> GetDefaultTexture(DefaultTextureType type) const override;
     std::shared_ptr<MTexture> CreateColorAttachment(uint32_t width, uint32_t height) override;
     std::shared_ptr<MTexture> CreateDepthStencilAttachment(uint32_t width, uint32_t height) override;

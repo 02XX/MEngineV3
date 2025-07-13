@@ -4,7 +4,10 @@
 #include "Logger.hpp"
 #include "MTexture.hpp"
 #include "VulkanContext.hpp"
+#include <cstdint>
 #include <imgui_impl_vulkan.h>
+#include <ktx.h>
+#include <ktxvulkan.h>
 #include <memory>
 #include <vulkan/vulkan_enums.hpp>
 
@@ -76,6 +79,104 @@ vk::ImageCreateFlags MTextureManager::PickImageFlags(const MTextureSetting &sett
         flags |= vk::ImageCreateFlagBits::eSparseBinding | vk::ImageCreateFlagBits::eSparseResidency;
     return flags;
 }
+std::pair<uint32_t, uint32_t> MTextureManager::PickPixelSize(vk::Format format)
+{
+    // return {channels, bytesPerPixel};
+    switch (format)
+    {
+    case vk::Format::eR8Unorm:
+    case vk::Format::eR8Snorm:
+    case vk::Format::eR8Uint:
+    case vk::Format::eR8Sint:
+    case vk::Format::eR8Srgb:
+        return {1, 1};
+
+    case vk::Format::eR8G8Unorm:
+    case vk::Format::eR8G8Snorm:
+    case vk::Format::eR8G8Uint:
+    case vk::Format::eR8G8Sint:
+    case vk::Format::eR8G8Srgb:
+        return {2, 2};
+
+    case vk::Format::eR8G8B8Unorm:
+    case vk::Format::eR8G8B8Snorm:
+    case vk::Format::eR8G8B8Uint:
+    case vk::Format::eR8G8B8Sint:
+    case vk::Format::eR8G8B8Srgb:
+        return {3, 3};
+
+    case vk::Format::eR8G8B8A8Unorm:
+    case vk::Format::eR8G8B8A8Snorm:
+    case vk::Format::eR8G8B8A8Uint:
+    case vk::Format::eR8G8B8A8Sint:
+    case vk::Format::eR8G8B8A8Srgb:
+        return {4, 4};
+
+    case vk::Format::eR16Unorm:
+    case vk::Format::eR16Snorm:
+    case vk::Format::eR16Uint:
+    case vk::Format::eR16Sint:
+    case vk::Format::eR16Sfloat:
+        return {1, 2};
+
+    case vk::Format::eR16G16Unorm:
+    case vk::Format::eR16G16Snorm:
+    case vk::Format::eR16G16Uint:
+    case vk::Format::eR16G16Sint:
+    case vk::Format::eR16G16Sfloat:
+        return {2, 4};
+
+    case vk::Format::eR16G16B16Unorm:
+    case vk::Format::eR16G16B16Snorm:
+    case vk::Format::eR16G16B16Uint:
+    case vk::Format::eR16G16B16Sint:
+    case vk::Format::eR16G16B16Sfloat:
+        return {3, 6};
+
+    case vk::Format::eR16G16B16A16Unorm:
+    case vk::Format::eR16G16B16A16Snorm:
+    case vk::Format::eR16G16B16A16Uint:
+    case vk::Format::eR16G16B16A16Sint:
+    case vk::Format::eR16G16B16A16Sfloat:
+        return {4, 8};
+
+    case vk::Format::eR32Uint:
+    case vk::Format::eR32Sint:
+    case vk::Format::eR32Sfloat:
+        return {1, 4};
+
+    case vk::Format::eR32G32Uint:
+    case vk::Format::eR32G32Sint:
+    case vk::Format::eR32G32Sfloat:
+        return {2, 8};
+
+    case vk::Format::eR32G32B32Uint:
+    case vk::Format::eR32G32B32Sint:
+    case vk::Format::eR32G32B32Sfloat:
+        return {3, 12};
+
+    case vk::Format::eR32G32B32A32Uint:
+    case vk::Format::eR32G32B32A32Sint:
+    case vk::Format::eR32G32B32A32Sfloat:
+        return {4, 16};
+
+    case vk::Format::eD16Unorm:
+        return {1, 2};
+
+    case vk::Format::eD32Sfloat:
+        return {1, 4};
+
+    case vk::Format::eD24UnormS8Uint:
+        return {1, 4};
+
+    case vk::Format::eD32SfloatS8Uint:
+        return {1, 5};
+
+    default:
+        LogError("Unknown format: {}", vk::to_string(format));
+        return {0, 0};
+    }
+}
 vk::ImageAspectFlags MTextureManager::GuessImageAspectFlags(vk::Format format)
 {
     switch (format)
@@ -142,6 +243,9 @@ void MTextureManager::CreateVulkanResources(std::shared_ptr<MTexture> texture)
         vmaDestroyImage(mVulkanContext->GetVmaAllocator(), image, texture->mAllocation);
     }
     vk::ImageCreateInfo imageCreateInfo{};
+    texture->mSetting.mipmapLevels = std::min(
+        static_cast<uint32_t>(std::floor(std::log2(std::max(texture->mSize.width, texture->mSize.height)))) + 1,
+        texture->mSetting.mipmapLevels);
     imageCreateInfo.setImageType(TextureTypeToImageType(texture->mSetting.ImageType))
         .setExtent({texture->mSize.width, texture->mSize.height, 1})
         .setMipLevels(texture->mSetting.mipmapLevels)
@@ -210,7 +314,8 @@ void MTextureManager::Write(std::shared_ptr<MTexture> texture)
     mVulkanContext->GetDevice().resetFences(mFence.get());
     vk::Buffer stagingBuffer;
     vk::BufferCreateInfo stagingBufferCreateInfo{};
-    stagingBufferCreateInfo.setSize(texture->mSize.width * texture->mSize.height * texture->mSize.channels)
+    stagingBufferCreateInfo
+        .setSize(texture->mSize.width * texture->mSize.height * PickPixelSize(texture->mSetting.format).second)
         .setUsage(vk::BufferUsageFlagBits::eTransferSrc)
         .setSharingMode(vk::SharingMode::eExclusive);
 
@@ -227,7 +332,7 @@ void MTextureManager::Write(std::shared_ptr<MTexture> texture)
         LogError("Failed to create staging buffer");
     }
     memcpy(stagingAllocationInfo.pMappedData, texture->mImageData.data(),
-           texture->mSize.width * texture->mSize.height * texture->mSize.channels);
+           texture->mSize.width * texture->mSize.height * PickPixelSize(texture->mSetting.format).second);
     mCommandBuffer->begin(vk::CommandBufferBeginInfo{});
     {
         // 转换图像布局UNDEFINED → TRANSFER_DST
@@ -235,6 +340,8 @@ void MTextureManager::Write(std::shared_ptr<MTexture> texture)
         imageBarrier.setImage(texture->mImage)
             .setOldLayout(vk::ImageLayout::eUndefined)
             .setNewLayout(vk::ImageLayout::eTransferDstOptimal)
+            .setSrcAccessMask(vk::AccessFlagBits::eNone)
+            .setDstAccessMask(vk::AccessFlagBits::eTransferWrite)
             .setSrcQueueFamilyIndex(mVulkanContext->GetQueueFamilyIndicates().graphicsFamily.value())
             .setDstQueueFamilyIndex(mVulkanContext->GetQueueFamilyIndicates().graphicsFamily.value())
             .setSubresourceRange(vk::ImageSubresourceRange()
@@ -259,11 +366,66 @@ void MTextureManager::Write(std::shared_ptr<MTexture> texture)
             .setImageExtent({texture->mSize.width, texture->mSize.height, 1});
         mCommandBuffer->copyBufferToImage(stagingBuffer, texture->mImage, vk::ImageLayout::eTransferDstOptimal,
                                           {bufferImageCopy});
+        // 如果需要生成mipmap，则生成mipmap
+        for (uint32_t mipmapLevel = 1; mipmapLevel < texture->mSetting.mipmapLevels; mipmapLevel++)
+        {
+            imageBarrier.setOldLayout(vk::ImageLayout::eTransferDstOptimal)
+                .setNewLayout(vk::ImageLayout::eTransferSrcOptimal)
+                .setSrcAccessMask(vk::AccessFlagBits::eTransferWrite)
+                .setDstAccessMask(vk::AccessFlagBits::eTransferRead)
+                .setSubresourceRange(vk::ImageSubresourceRange()
+                                         .setAspectMask(GuessImageAspectFlags(texture->mSetting.format))
+                                         .setBaseMipLevel(mipmapLevel - 1)
+                                         .setLevelCount(1)
+                                         .setBaseArrayLayer(0)
+                                         .setLayerCount(texture->mSetting.arrayLayers));
+            mCommandBuffer->pipelineBarrier(vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eTransfer,
+                                            {}, {}, {}, {imageBarrier});
+            int32_t mipWidth = std::max(1u, texture->mSize.width >> (mipmapLevel - 1));
+            int32_t mipHeight = std::max(1u, texture->mSize.height >> (mipmapLevel - 1));
+            vk::ImageBlit imageBlit{};
+            imageBlit.setSrcOffsets({vk::Offset3D{0, 0, 0}, vk::Offset3D{mipWidth, mipHeight, 1}})
+                .setSrcSubresource(vk::ImageSubresourceLayers()
+                                       .setAspectMask(GuessImageAspectFlags(texture->mSetting.format))
+                                       .setMipLevel(mipmapLevel - 1)
+                                       .setBaseArrayLayer(0)
+                                       .setLayerCount(texture->mSetting.arrayLayers))
+                .setDstOffsets(
+                    {vk::Offset3D{0, 0, 0}, vk::Offset3D{std::max(mipWidth / 2, 1), std::max(mipHeight / 2, 1), 1}})
+                .setDstSubresource(vk::ImageSubresourceLayers()
+                                       .setAspectMask(GuessImageAspectFlags(texture->mSetting.format))
+                                       .setMipLevel(mipmapLevel)
+                                       .setBaseArrayLayer(0)
+                                       .setLayerCount(texture->mSetting.arrayLayers));
+            mCommandBuffer->blitImage(texture->mImage, vk::ImageLayout::eTransferSrcOptimal, texture->mImage,
+                                      vk::ImageLayout::eTransferDstOptimal, {imageBlit}, vk::Filter::eLinear);
+
+            imageBarrier.setOldLayout(vk::ImageLayout::eTransferSrcOptimal)
+                .setNewLayout(vk::ImageLayout::eShaderReadOnlyOptimal)
+                .setSrcAccessMask(vk::AccessFlagBits::eTransferWrite)
+                .setDstAccessMask(vk::AccessFlagBits::eShaderRead)
+                .setSubresourceRange(vk::ImageSubresourceRange()
+                                         .setAspectMask(GuessImageAspectFlags(texture->mSetting.format))
+                                         .setBaseMipLevel(mipmapLevel - 1)
+                                         .setLevelCount(1)
+                                         .setBaseArrayLayer(0)
+                                         .setLayerCount(texture->mSetting.arrayLayers));
+            mCommandBuffer->pipelineBarrier(vk::PipelineStageFlagBits::eTransfer,
+                                            vk::PipelineStageFlagBits::eFragmentShader, {}, {}, {}, {imageBarrier});
+        }
         // 转换图像布局：TRANSFER_DST → SHADER_READ
         imageBarrier.setOldLayout(vk::ImageLayout::eTransferDstOptimal)
             .setNewLayout(vk::ImageLayout::eShaderReadOnlyOptimal)
             .setSrcQueueFamilyIndex(mVulkanContext->GetQueueFamilyIndicates().graphicsFamily.value())
-            .setDstQueueFamilyIndex(mVulkanContext->GetQueueFamilyIndicates().graphicsFamily.value());
+            .setDstQueueFamilyIndex(mVulkanContext->GetQueueFamilyIndicates().graphicsFamily.value())
+            .setSrcAccessMask(vk::AccessFlagBits::eTransferWrite)
+            .setDstAccessMask(vk::AccessFlagBits::eShaderRead)
+            .setSubresourceRange(vk::ImageSubresourceRange()
+                                     .setAspectMask(GuessImageAspectFlags(texture->mSetting.format))
+                                     .setBaseMipLevel(texture->mSetting.mipmapLevels - 1)
+                                     .setLevelCount(1)
+                                     .setBaseArrayLayer(0)
+                                     .setLayerCount(texture->mSetting.arrayLayers));
         mCommandBuffer->pipelineBarrier(vk::PipelineStageFlagBits::eTransfer,
                                         vk::PipelineStageFlagBits::eFragmentShader, {}, {}, {}, {imageBarrier});
     }
@@ -298,6 +460,9 @@ void MTextureManager::CreateDefault()
     auto emissiveTexture = CreateEmissiveTexture();
     auto albedoTexture = CreateAlbedoTexture();
     auto armTexture = CreateARMTexture();
+    auto environmentMap = CreateEnvironmentMap();
+    auto irradianceMap = CreateIrradianceMap();
+    auto brdfLUT = CreateBRDFLUT();
     Remove(whiteTexture->mID);
     Remove(blackTexture->mID);
     Remove(magentaTexture->mID);
@@ -305,6 +470,9 @@ void MTextureManager::CreateDefault()
     Remove(emissiveTexture->mID);
     Remove(albedoTexture->mID);
     Remove(armTexture->mID);
+    Remove(environmentMap->mID);
+    Remove(irradianceMap->mID);
+    Remove(brdfLUT->mID);
     whiteTexture->mID = mDefaultTextures[DefaultTextureType::White];
     blackTexture->mID = mDefaultTextures[DefaultTextureType::Black];
     magentaTexture->mID = mDefaultTextures[DefaultTextureType::Magenta];
@@ -312,6 +480,9 @@ void MTextureManager::CreateDefault()
     emissiveTexture->mID = mDefaultTextures[DefaultTextureType::Emissive];
     albedoTexture->mID = mDefaultTextures[DefaultTextureType::Albedo];
     armTexture->mID = mDefaultTextures[DefaultTextureType::ARM];
+    environmentMap->mID = mDefaultTextures[DefaultTextureType::EnvironmentMap];
+    irradianceMap->mID = mDefaultTextures[DefaultTextureType::IrradianceMap];
+    brdfLUT->mID = mDefaultTextures[DefaultTextureType::BRDFLUT];
 
     mAssets[mDefaultTextures[DefaultTextureType::White]] = whiteTexture;
     mAssets[mDefaultTextures[DefaultTextureType::Black]] = blackTexture;
@@ -320,6 +491,9 @@ void MTextureManager::CreateDefault()
     mAssets[mDefaultTextures[DefaultTextureType::Emissive]] = emissiveTexture;
     mAssets[mDefaultTextures[DefaultTextureType::Albedo]] = albedoTexture;
     mAssets[mDefaultTextures[DefaultTextureType::ARM]] = armTexture;
+    mAssets[mDefaultTextures[DefaultTextureType::EnvironmentMap]] = environmentMap;
+    mAssets[mDefaultTextures[DefaultTextureType::IrradianceMap]] = irradianceMap;
+    mAssets[mDefaultTextures[DefaultTextureType::BRDFLUT]] = brdfLUT;
 }
 std::shared_ptr<MTexture> MTextureManager::CreateWhiteTexture()
 {
@@ -409,5 +583,62 @@ std::shared_ptr<MTexture> MTextureManager::CreateDepthStencilAttachment(uint32_t
         Create("Depth Stencil Attachment", {width, height, 4}, {}, depthStencilAttachmentSetting);
     CreateVulkanResources(depthStencilAttachment);
     return depthStencilAttachment;
+}
+std::shared_ptr<MTexture> MTextureManager::CreateEnvironmentMap()
+{
+    auto environmentMapSetting = MTextureSetting();
+    environmentMapSetting.isShaderResource = true;
+    environmentMapSetting.format = vk::Format::eR32G32B32A32Sfloat;
+    environmentMapSetting.ImageType = vk::ImageViewType::e2D;
+    environmentMapSetting.mipmapLevels = 9;
+    environmentMapSetting.maxLod = 8;
+    auto &&[W, H, C, data] = Utils::ImageUtil::LoadHDRImage("Engine/Textures/EnvironmentMap.hdr");
+    auto environmentMap =
+        Create("Environment Map", {static_cast<uint32_t>(W), static_cast<uint32_t>(H), static_cast<uint32_t>(C)}, data,
+               environmentMapSetting);
+    CreateVulkanResources(environmentMap);
+    Write(environmentMap);
+    return environmentMap;
+}
+std::shared_ptr<MTexture> MTextureManager::CreateIrradianceMap()
+{
+    auto irradianceMapSetting = MTextureSetting();
+    irradianceMapSetting.isShaderResource = true;
+    irradianceMapSetting.format = vk::Format::eR32G32B32A32Sfloat;
+    irradianceMapSetting.ImageType = vk::ImageViewType::e2D;
+    irradianceMapSetting.mipmapLevels = 1;
+    auto &&[W, H, C, data] = Utils::ImageUtil::LoadHDRImage("Engine/Textures/IrradianceMap.hdr");
+    auto irradianceMap =
+        Create("Irradiance Map", {static_cast<uint32_t>(W), static_cast<uint32_t>(H), static_cast<uint32_t>(C)}, data,
+               irradianceMapSetting);
+    CreateVulkanResources(irradianceMap);
+    Write(irradianceMap);
+    return irradianceMap;
+}
+std::shared_ptr<MTexture> MTextureManager::CreateBRDFLUT()
+{
+    ktxTexture *brdfLUTTexture = nullptr;
+    if (ktxTexture_CreateFromNamedFile("E:/Code/MEngineV3/Resource/Engine/Textures/BRDFLUT.ktx",
+                                       KTX_TEXTURE_CREATE_LOAD_IMAGE_DATA_BIT, &brdfLUTTexture) != KTX_SUCCESS)
+    {
+        LogError("Failed to load BRDF LUT texture");
+        throw std::runtime_error("Failed to load BRDF LUT texture");
+    }
+    auto brdfLUTSetting = MTextureSetting();
+    brdfLUTSetting.isShaderResource = true;
+    brdfLUTSetting.format = static_cast<vk::Format>(ktxTexture_GetVkFormat(ktxTexture(brdfLUTTexture)));
+    brdfLUTSetting.mipmapLevels = brdfLUTTexture->numLevels;
+    auto &&[C, S] = PickPixelSize(brdfLUTSetting.format);
+    auto brdfLUT = Create("BRDF LUT",
+                          {
+                              static_cast<uint32_t>(brdfLUTTexture->baseWidth),
+                              static_cast<uint32_t>(brdfLUTTexture->baseHeight),
+                              static_cast<uint32_t>(C),
+                          },
+                          std::vector<uint8_t>(brdfLUTTexture->pData, brdfLUTTexture->pData + brdfLUTTexture->dataSize),
+                          brdfLUTSetting);
+    CreateVulkanResources(brdfLUT);
+    Write(brdfLUT);
+    return brdfLUT;
 }
 } // namespace MEngine::Core::Manager
