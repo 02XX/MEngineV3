@@ -127,6 +127,10 @@ class MTexture final : public MAsset
     {
         mThumbnailDescriptorSet = thumbnailDescriptorSet;
     }
+    inline const std::vector<uint8_t> &GetImageData() const
+    {
+        return mImageData;
+    }
 };
 
 } // namespace MEngine::Core::Asset

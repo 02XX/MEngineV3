@@ -31,13 +31,19 @@ static void RegisterAsset()
         .data<&MAsset::SetID, &MAsset::GetID>("ID"_hs)
         .custom<Info>(Info{
             .DisplayName = "ID",
-            .Editable = false,
+            .Editable = true,
             .Serializable = true,
         })
         .data<&MAsset::SetPath, &MAsset::GetPath>("Path"_hs)
         .custom<Info>(Info{
             .DisplayName = "Asset Path",
             .Editable = false,
+            .Serializable = true,
+        })
+        .data<&MAsset::SetName, &MAsset::GetName>("Name"_hs)
+        .custom<Info>(Info{
+            .DisplayName = "Asset Name",
+            .Editable = true,
             .Serializable = true,
         });
     entt::meta_factory<MTexture>()

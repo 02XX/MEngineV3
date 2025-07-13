@@ -203,13 +203,6 @@ void MTextureManager::CreateVulkanResources(std::shared_ptr<MTexture> texture)
     {
         LogError("Failed to create texture image view");
     }
-    // 创建缩略图描述集
-    if (!texture->mSetting.isDepthStencil)
-    {
-        texture->mThumbnailDescriptorSet =
-            ImGui_ImplVulkan_AddTexture(texture->mSampler.get(), texture->mImageView.get(),
-                                        static_cast<VkImageLayout>(vk::ImageLayout::eShaderReadOnlyOptimal));
-    }
 }
 void MTextureManager::Write(std::shared_ptr<MTexture> texture)
 {
@@ -288,6 +281,13 @@ void MTextureManager::Write(std::shared_ptr<MTexture> texture)
     }
     // 清理临时资源
     vmaDestroyBuffer(mVulkanContext->GetVmaAllocator(), stagingBuffer, stagingAllocation);
+    // 创建缩略图描述集
+    if (!texture->mSetting.isDepthStencil)
+    {
+        texture->mThumbnailDescriptorSet =
+            ImGui_ImplVulkan_AddTexture(texture->mSampler.get(), texture->mImageView.get(),
+                                        static_cast<VkImageLayout>(vk::ImageLayout::eShaderReadOnlyOptimal));
+    }
 }
 void MTextureManager::CreateDefault()
 {

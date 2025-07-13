@@ -27,9 +27,8 @@ class MFolder : public MAsset
     std::vector<std::shared_ptr<MAsset>> mChildren;
 
   public:
-    MFolder(const UUID &id, const std::string &name, const UUID &parentFolderID, const std::vector<UUID> &childrenIDs,
-            const MFolderSetting &setting)
-        : MAsset(id, name), mSetting(setting), mParentFolderID(parentFolderID), mChildrenIDs(childrenIDs)
+    MFolder(const UUID &id, const std::string &name, const MFolderSetting &setting)
+        : MAsset(id, name), mSetting(setting)
     {
         mType = MAssetType::Folder;
         mState = MAssetState::Unloaded;
@@ -42,7 +41,11 @@ class MFolder : public MAsset
     }
     inline void SetParentFolder(const std::shared_ptr<MFolder> &parent)
     {
-        mParentFolder = parent;
+        if (parent)
+        {
+            mParentFolderID = parent->GetID();
+            mParentFolder = parent;
+        }
     }
     inline const std::vector<std::shared_ptr<MAsset>> &GetChildren() const
     {
@@ -50,7 +53,11 @@ class MFolder : public MAsset
     }
     inline void AddChild(const std::shared_ptr<MAsset> &child)
     {
-        mChildren.push_back(child);
+        if (child)
+        {
+            mChildrenIDs.push_back(child->GetID());
+            mChildren.push_back(child);
+        }
     }
     inline void RemoveChild(const std::shared_ptr<MAsset> &child)
     {

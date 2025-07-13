@@ -10,7 +10,6 @@ class IMFolderManager : public virtual IMManager<MFolder>
 {
   public:
     ~IMFolderManager() override = default;
-    virtual std::shared_ptr<MFolder> Create(const std::string &name, const UUID &parentFolderID,
-                                            const std::vector<UUID> &childrenIDs, const MFolderSetting &setting) = 0;
+    virtual std::shared_ptr<MFolder> Create(const std::string &name, const MFolderSetting &setting) = 0;
 };
 } // namespace MEngine::Core::Manager

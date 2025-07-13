@@ -4,12 +4,14 @@
 #include "EditorSerialize.hpp"
 #include "IMMeshManager.hpp"
 #include "IMModelManager.hpp"
+#include "IMTextureManager.hpp"
 #include "Logger.hpp"
 #include "MAsset.hpp"
 #include "MCameraComponent.hpp"
 #include "MCameraSystem.hpp"
 #include "MFolderManager.hpp"
 #include "MLightComponent.hpp"
+#include "MMaterial.hpp"
 #include "MMaterialComponent.hpp"
 #include "MMesh.hpp"
 #include "MMeshComponent.hpp"
@@ -30,6 +32,7 @@
 #include "MTransformSystem.hpp"
 #include "Math.hpp"
 #include "RenderPassManager.hpp"
+#include "ResourceManager.hpp"
 #include "TaskManager.hpp"
 #include "UUIDGenerator.hpp"
 #include "VulkanContext.hpp"
@@ -50,7 +53,9 @@
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_vulkan.h>
 #include <imgui_internal.h>
+#include <imgui_stdlib.h>
 #include <memory>
+#include <vector>
 #include <vulkan/vulkan_core.h>
 #include <vulkan/vulkan_handles.hpp>
 
@@ -101,11 +106,6 @@ void MEngineEditor::Init()
     lightComponent.LightType = LightType::Directional;
     lightTransform.name = "Directional Light";
     lightTransform.localRotation = glm::quat(glm::vec3(0.0, -glm::half_pi<float>(), 0.0f));
-
-    // bow
-    // auto bowModel = mAssetDatabase->LoadFBX("Assets/cubeTest.fbx");
-    // mAssetDatabase->SaveAsset(bowModel, mCurrentFolder->GetPath() / "cubeTest");
-    // auto bowEntity = Function::Utils::EntityUtils::CreateEntity(registry, bowModel);
     LogInfo("MEngine Editor initialized successfully");
 }
 void MEngineEditor::InitWindow()
@@ -878,6 +878,33 @@ void MEngineEditor::RenderHierarchyPanel()
                 auto entity = registry->create();
                 auto &transform = registry->emplace<MTransformComponent>(entity);
             }
+            if (ImGui::BeginMenu("Geometry"))
+            {
+                auto modelManager = injector.create<std::shared_ptr<IMModelManager>>();
+                if (ImGui::MenuItem("Cube"))
+                {
+                    auto cubeModel = modelManager->CreateCube();
+                    Function::Utils::EntityUtils::CreateEntity(registry, cubeModel);
+                }
+                if (ImGui::MenuItem("Sphere"))
+                {
+                    auto sphereModel = modelManager->CreateSphere();
+                    Function::Utils::EntityUtils::CreateEntity(registry, sphereModel);
+                }
+                if (ImGui::MenuItem("Plane"))
+                {
+                    auto planeModel = modelManager->CreatePlane();
+                    Function::Utils::EntityUtils::CreateEntity(registry, planeModel);
+                }
+                if (ImGui::MenuItem("Cylinder"))
+                {
+                    auto cylinderModel = modelManager->CreateCylinder();
+                    Function::Utils::EntityUtils::CreateEntity(registry, cylinderModel);
+                }
+                ImGui::EndMenu();
+            }
+            {
+            }
             if (mSelectedEntity != entt::null && registry->valid(mSelectedEntity))
             {
                 if (ImGui::MenuItem("Delete"))
@@ -973,43 +1000,39 @@ void MEngineEditor::RenderInspectorPanel()
                 {
                     auto &transform = registry->get<MTransformComponent>(mSelectedEntity);
                     auto metaTransform = entt::forward_as_meta(transform);
-                    ReflectObject(metaTransform, entt::resolve<MTransformComponent>());
+                    if (ReflectObject(metaTransform, entt::resolve<MTransformComponent>()))
+                    {
+                    }
                 }
                 if (registry->any_of<MCameraComponent>(mSelectedEntity))
                 {
                     auto &camera = registry->get<MCameraComponent>(mSelectedEntity);
                     auto metaCamera = entt::forward_as_meta(camera);
-                    ReflectObject(metaCamera, entt::resolve<MCameraComponent>());
+                    if (ReflectObject(metaCamera, entt::resolve<MCameraComponent>()))
+                    {
+                    }
                 }
                 if (registry->any_of<MMeshComponent>(mSelectedEntity))
                 {
                     auto &mesh = registry->get<MMeshComponent>(mSelectedEntity);
                     auto metaMesh = entt::forward_as_meta(mesh);
-                    ReflectObject(metaMesh, entt::resolve<MMeshComponent>());
+                    if (ReflectObject(metaMesh, entt::resolve<MMeshComponent>()))
+                    {
+                    }
                 }
                 if (registry->any_of<MMaterialComponent>(mSelectedEntity))
                 {
                     auto &materialComponent = registry->get<MMaterialComponent>(mSelectedEntity);
                     auto metaMaterial = entt::forward_as_meta(materialComponent);
+                    auto pbrMaterialManager = injector.create<std::shared_ptr<MPBRMaterialManager>>();
                     if (ReflectObject(metaMaterial, entt::resolve<MMaterialComponent>()))
                     {
+                        auto vulkanContext = injector.create<std::shared_ptr<VulkanContext>>();
                         vulkanContext->GetDevice().waitIdle();
-                        switch (materialComponent.material->GetMaterialType())
-                        {
-                        case Core::Asset::MMaterialType::Unknown:
-                        case Core::Asset::MMaterialType::PBR: {
-                            auto pbrMaterialManager = injector.create<std::shared_ptr<MPBRMaterialManager>>();
-                            if (auto pbrMaterial = std::dynamic_pointer_cast<MPBRMaterial>(materialComponent.material))
-                            {
-                                pbrMaterialManager->Update(pbrMaterial);
-                                pbrMaterialManager->Write(pbrMaterial);
-                            }
-                            break;
-                        }
-                        case Core::Asset::MMaterialType::Unlit:
-                        case Core::Asset::MMaterialType::Custom:
-                            break;
-                        }
+                        auto pbrMaterial = pbrMaterialManager->Get(materialComponent.materialID);
+                        pbrMaterialManager->Update(pbrMaterial);
+                        pbrMaterialManager->Write(pbrMaterial);
+                        materialComponent.material = pbrMaterial;
                     }
                 }
                 if (registry->any_of<MLightComponent>(mSelectedEntity))
@@ -1030,16 +1053,40 @@ void MEngineEditor::RenderInspectorPanel()
                 switch (mSelectedAsset->GetType())
                 {
                 case MAssetType::Texture: {
-                    auto texture = std::static_pointer_cast<MTexture>(mSelectedAsset);
+                    auto texture = std::dynamic_pointer_cast<MTexture>(mSelectedAsset);
                     auto metaAsset = entt::forward_as_meta(*texture);
                     ReflectObject(metaAsset, entt::resolve<MTexture>());
                     break;
                 }
                 case MAssetType::Shader: {
-                    auto pipeline = std::static_pointer_cast<MPipeline>(mSelectedAsset);
+                    auto pipeline = std::dynamic_pointer_cast<MPipeline>(mSelectedAsset);
                     auto metaAsset = entt::forward_as_meta(*pipeline);
                     ReflectObject(metaAsset, entt::resolve<MPipeline>());
                     break;
+                }
+                case MAssetType::Material: {
+                    auto material = std::dynamic_pointer_cast<MMaterial>(mSelectedAsset);
+                    switch (material->GetMaterialType())
+                    {
+                    case Core::Asset::MMaterialType::Unknown:
+                    case Core::Asset::MMaterialType::PBR: {
+                        auto pbrMaterial = std::dynamic_pointer_cast<MPBRMaterial>(material);
+                        auto pbrMaterialMeta = entt::forward_as_meta(*pbrMaterial);
+                        if (ReflectObject(pbrMaterialMeta, entt::resolve<MPBRMaterial>()))
+                        {
+                            auto vulkanContext = injector.create<std::shared_ptr<VulkanContext>>();
+                            vulkanContext->GetDevice().waitIdle();
+                            auto pbrMaterialManager = injector.create<std::shared_ptr<MPBRMaterialManager>>();
+                            pbrMaterialManager->Update(pbrMaterial);
+                            pbrMaterialManager->Write(pbrMaterial);
+                            mAssetDatabase->SaveAsset(pbrMaterial);
+                        }
+                        break;
+                    }
+                    case Core::Asset::MMaterialType::Unlit:
+                    case Core::Asset::MMaterialType::Custom:
+                        break;
+                    }
                 }
                 default:
                     break;
@@ -1131,6 +1178,19 @@ void MEngineEditor::RenderAssetPanel()
                     ImGui::Image(reinterpret_cast<ImTextureID>(mAssetIcons[asset->GetType()]), ImVec2(50, 50));
                     ImGui::EndDragDropSource();
                 }
+                if (ImGui::BeginDragDropTarget())
+                {
+                    if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload("ASSET"))
+                    {
+                        IM_ASSERT(payload->DataSize == sizeof(std::shared_ptr<MAsset>));
+                        auto draggedAsset = *static_cast<std::shared_ptr<MAsset> *>(payload->Data);
+                        if (asset->GetType() == MAssetType::Folder)
+                        {
+                            mAssetDatabase->MoveAsset(draggedAsset, std::dynamic_pointer_cast<MFolder>(asset));
+                        }
+                    }
+                    ImGui::EndDragDropTarget();
+                }
                 auto selectableRectMin = ImGui::GetItemRectMin();
                 auto selectableRectMax = ImGui::GetItemRectMax();
                 auto selectableRectSize = ImGui::GetItemRectSize();
@@ -1165,15 +1225,23 @@ void MEngineEditor::RenderAssetPanel()
             auto &executor = Thread::TaskManager::GetExecutor();
             if (ImGui::MenuItem("New Folder"))
             {
-                auto folder = mAssetDatabase->CreateFolder(mCurrentFolder->GetPath(), "New Folder", {});
-                mAssetDatabase->SaveFolder(folder, mCurrentFolder->GetPath() / "New Folder");
+                auto folderManager = injector.create<std::shared_ptr<MFolderManager>>();
+                auto newDirectory = mAssetDatabase->GenerateUniqueAssetPath(mCurrentFolder->GetPath() / "New Folder");
+                auto folder = folderManager->Create(newDirectory.filename().stem().string(), {});
+                folder->SetPath(newDirectory);
+                mAssetDatabase->SaveFolder(folder);
             }
             if (ImGui::MenuItem("New Texture"))
             {
                 auto textureManager = injector.create<std::shared_ptr<MTextureManager>>();
                 auto textureSetting = MTextureSetting{};
                 auto texture = textureManager->Create("New Texture", {800, 600, 4}, {}, textureSetting);
-                mAssetDatabase->SaveAsset<MTexture>(texture, mCurrentFolder->GetPath() / "New Texture");
+                auto savePath =
+                    mAssetDatabase->GenerateUniqueAssetPath(mCurrentFolder->GetPath() / "New Texture.masset");
+                texture->SetPath(savePath);
+                textureManager->Update(texture);
+                textureManager->CreateVulkanResources(texture);
+                mAssetDatabase->SaveAsset(texture);
             }
             if (ImGui::MenuItem("New Pipeline"))
             {
@@ -1182,18 +1250,40 @@ void MEngineEditor::RenderAssetPanel()
                 pipelineSetting.VertexShaderPath = "Assets/Shaders/ForwardOpaquePBR.vert";
                 pipelineSetting.FragmentShaderPath = "Assets/Shaders/ForwardOpaquePBR.frag";
                 auto pipeline = pipelineManager->Create("New Pipeline", pipelineSetting);
-                mAssetDatabase->SaveAsset<MPipeline>(pipeline, mCurrentFolder->GetPath() / "New Pipeline");
+                auto savePath =
+                    mAssetDatabase->GenerateUniqueAssetPath(mCurrentFolder->GetPath() / "New Pipeline.masset");
+                pipeline->SetPath(savePath);
+                pipelineManager->Update(pipeline);
+                pipelineManager->CreateVulkanResources(pipeline);
+                mAssetDatabase->SaveAsset(pipeline);
+            }
+            if (ImGui::BeginMenu("New Material"))
+            {
+                if (ImGui::MenuItem("PBR Material"))
+                {
+                    auto pbrMaterialManager = injector.create<std::shared_ptr<MPBRMaterialManager>>();
+                    auto textureManager = injector.create<std::shared_ptr<MTextureManager>>();
+                    auto savePath =
+                        mAssetDatabase->GenerateUniqueAssetPath(mCurrentFolder->GetPath() / "New PBR Material.masset");
+                    auto pbrMaterialProperties = MPBRMaterialProperties{};
+                    auto pbrTextures = MPBRTextures{};
+                    pbrTextures.AlbedoID = textureManager->GetDefaultTexture(DefaultTextureType::Albedo)->GetID();
+                    pbrTextures.NormalID = textureManager->GetDefaultTexture(DefaultTextureType::Normal)->GetID();
+                    pbrTextures.ARMID = textureManager->GetDefaultTexture(DefaultTextureType::ARM)->GetID();
+                    pbrTextures.EmissiveID = textureManager->GetDefaultTexture(DefaultTextureType::Emissive)->GetID();
+                    auto pbrMaterialSetting = MPBRMaterialSetting{};
+                    auto pbrMaterial =
+                        pbrMaterialManager->Create(savePath.filename().stem().string(), PipelineType::ForwardOpaquePBR,
+                                                   pbrMaterialProperties, pbrTextures, pbrMaterialSetting);
+                    pbrMaterial->SetPath(savePath);
+                    pbrMaterialManager->Update(pbrMaterial);
+                    pbrMaterialManager->CreateVulkanResources(pbrMaterial);
+                    pbrMaterialManager->Write(pbrMaterial);
+                    mAssetDatabase->SaveAsset(pbrMaterial);
+                }
+                ImGui::EndMenu();
             }
             ImGui::EndPopup();
-        }
-        // 拖拽目标
-        if (ImGui::BeginDragDropTarget())
-        {
-            if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload("ENTITY"))
-            {
-                entt::entity draggedEntity = *static_cast<const entt::entity *>(payload->Data);
-            }
-            ImGui::EndDragDropTarget();
         }
         ImGuiWindow *window = ImGui::GetCurrentWindow();
         ImRect windowRect(window->InnerRect.Min, window->InnerRect.Max);
@@ -1202,8 +1292,22 @@ void MEngineEditor::RenderAssetPanel()
             ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
             ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0, 0, 0, 0));
             ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0, 0, 0, 0));
-            if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload("EXTERNAL_FILE"))
+            if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload("ENTITY"))
             {
+
+                IM_ASSERT(payload->DataSize == sizeof(entt::entity));
+                entt::entity draggedEntity = *(const entt::entity *)payload->Data;
+                auto registry = injector.create<std::shared_ptr<entt::registry>>();
+                auto resourceManager = injector.create<std::shared_ptr<ResourceManager>>();
+                if (registry->any_of<MTransformComponent>(draggedEntity))
+                {
+                    auto model =
+                        Function::Utils::EntityUtils::GetModelFromEntity(resourceManager, registry, draggedEntity);
+                    auto savePath = mAssetDatabase->GenerateUniqueAssetPath(mCurrentFolder->GetPath() /
+                                                                            (model->GetName() + ".masset"));
+                    model->SetPath(savePath);
+                    mAssetDatabase->SaveAsset<MModel>(model);
+                }
             }
             ImGui::PopStyleColor(3);
             ImGui::EndDragDropTarget();
@@ -1212,21 +1316,25 @@ void MEngineEditor::RenderAssetPanel()
     }
     ImGui::End();
 }
-bool MEngineEditor::ReflectObject(entt::meta_any &instance, entt::meta_type type)
+bool MEngineEditor::ReflectObject(entt::meta_any &instance, entt::meta_type type, bool head, std::string headName)
 {
     auto *info = static_cast<Info *>(type.custom());
     if (info == nullptr || !info->Serializable)
         return false;
     auto instanceName = info->DisplayName;
+    if (headName.empty())
+        headName = instanceName;
     bool isModified = false;
-    if (ImGui::CollapsingHeader(instanceName.data(), ImGuiTreeNodeFlags_DefaultOpen))
+    if (ImGui::CollapsingHeader(headName.data(), ImGuiTreeNodeFlags_DefaultOpen))
     {
+
         for (auto &&[id, field] : type.data())
         {
             auto fieldInfo = static_cast<Info *>(field.custom());
             if (fieldInfo == nullptr || !fieldInfo->Serializable)
                 continue;
-            auto fieldName = fieldInfo->DisplayName.c_str();
+            std::string fieldNameStr = fieldInfo->DisplayName;
+            auto fieldName = fieldNameStr.c_str();
             auto fieldType = field.type();
             auto fieldValue = field.get(instance);
             // UI
@@ -1263,8 +1371,8 @@ bool MEngineEditor::ReflectObject(entt::meta_any &instance, entt::meta_type type
                 }
                 else if (fieldType == entt::resolve<std::string>())
                 {
-                    auto value = fieldValue.cast<std::string>();
-                    if (ImGui::InputText(fieldName, value.data(), value.capacity() + 1))
+                    std::string value = fieldValue.cast<std::string>();
+                    if (ImGui::InputText(fieldName, &value))
                     {
                         field.set(instance, value);
                         isModified = true;
@@ -1274,7 +1382,7 @@ bool MEngineEditor::ReflectObject(entt::meta_any &instance, entt::meta_type type
                 {
                     auto path = fieldValue.cast<std::filesystem::path>();
                     auto value = path.string();
-                    if (ImGui::InputText(fieldName, value.data(), value.capacity() + 1))
+                    if (ImGui::InputText(fieldName, &value))
                     {
                         field.set(instance, std::filesystem::path(value));
                         isModified = true;
@@ -1282,8 +1390,45 @@ bool MEngineEditor::ReflectObject(entt::meta_any &instance, entt::meta_type type
                 }
                 else if (fieldType == entt::resolve<UUID>())
                 {
-                    auto value = fieldValue.cast<UUID>().ToString();
-                    ImGui::Text("%s: %s", fieldName, value.c_str());
+                    auto value = fieldValue.cast<UUID>();
+                    ImGui::LabelText(fieldName, "%s", value.ToString().c_str());
+                    if (type == entt::resolve<MMaterialComponent>())
+                    {
+                        auto pbrMaterialManager = injector.create<std::shared_ptr<MPBRMaterialManager>>();
+                        auto items = pbrMaterialManager->GetAll();
+                        auto currentMaterial = pbrMaterialManager->Get(value);
+                        if (ImGui::BeginCombo(fieldName, currentMaterial->GetName().c_str()))
+                        {
+                            for (const auto &item : items)
+                            {
+                                bool isSelected = (item->GetID() == value);
+                                ImGui::PushID(item->GetID().ToString().c_str());
+                                if (ImGui::Selectable(item->GetName().c_str(), isSelected))
+                                {
+                                    field.set(instance, item->GetID());
+                                    isModified = true;
+                                }
+                                ImGui::PopID();
+                                if (isSelected)
+                                    ImGui::SetItemDefaultFocus();
+                            }
+                            ImGui::EndCombo();
+                        }
+                        if (ImGui::BeginDragDropTarget())
+                        {
+                            if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload("ASSET"))
+                            {
+                                IM_ASSERT(payload->DataSize == sizeof(std::shared_ptr<MAsset>));
+                                auto draggedAsset = *static_cast<std::shared_ptr<MAsset> *>(payload->Data);
+                                if (draggedAsset->GetType() == Core::Asset::MAssetType::Material)
+                                {
+                                    field.set(instance, draggedAsset->GetID());
+                                    isModified = true;
+                                }
+                            }
+                            ImGui::EndDragDropTarget();
+                        }
+                    }
                 }
                 else if (fieldType == entt::resolve<glm::vec2>())
                 {
@@ -1323,11 +1468,40 @@ bool MEngineEditor::ReflectObject(entt::meta_any &instance, entt::meta_type type
                         isModified = true;
                     }
                 }
+                else if (fieldType == entt::resolve<TextureSize>())
+                {
+                    auto value = fieldValue.cast<TextureSize>();
+                    ImGui::Text("%s: %dx%dx%d", fieldName, value.width, value.height, value.channels);
+                }
                 else if (fieldType == entt::resolve<MPBRMaterialProperties>())
                 {
                     auto value = fieldValue.cast<MPBRMaterialProperties>();
-                    auto metaProperties = entt::forward_as_meta(value);
-                    if (ReflectObject(metaProperties, entt::resolve<MPBRMaterialProperties>()))
+                    if (ImGui::ColorEdit3("Albedo", glm::value_ptr(value.Albedo), ImGuiColorEditFlags_Float))
+                    {
+                        field.set(instance, value);
+                        isModified = true;
+                    }
+                    if (ImGui::DragFloat3("Normal", glm::value_ptr(value.Normal), 0.01f, -1.0f, 1.0f))
+                    {
+                        field.set(instance, value);
+                        isModified = true;
+                    }
+                    if (ImGui::DragFloat("Metallic", &value.Metallic, 0.01f, 0.0f, 1.0f))
+                    {
+                        field.set(instance, value);
+                        isModified = true;
+                    }
+                    if (ImGui::DragFloat("Roughness", &value.Roughness, 0.01f, 0.0f, 1.0f))
+                    {
+                        field.set(instance, value);
+                        isModified = true;
+                    }
+                    if (ImGui::DragFloat("AO", &value.AO, 0.01f, 0.0f, 1.0f))
+                    {
+                        field.set(instance, value);
+                        isModified = true;
+                    }
+                    if (ImGui::DragFloat("EmissiveIntensity", &value.EmissiveIntensity, 0.01f, 0.0f, 10.0f))
                     {
                         field.set(instance, value);
                         isModified = true;
@@ -1336,36 +1510,16 @@ bool MEngineEditor::ReflectObject(entt::meta_any &instance, entt::meta_type type
                 else if (fieldType == entt::resolve<MPBRTextures>())
                 {
                     auto value = fieldValue.cast<MPBRTextures>();
-                    auto metaTextures = entt::forward_as_meta(value);
-                    ReflectObject(metaTextures, entt::resolve<MPBRTextures>());
-                }
-                else if (fieldType == entt::resolve<vk::DescriptorSet>())
-                {
-                    auto value = fieldValue.cast<vk::DescriptorSet>();
-                    ImGui::Image(reinterpret_cast<ImTextureID>(static_cast<VkDescriptorSet>(value)), ImVec2(100, 100));
-                }
-                else if (fieldType == entt::resolve<TextureSize>())
-                {
-                    auto value = fieldValue.cast<TextureSize>();
-                    ImGui::Text("%s: %dx%dx%d", fieldName, value.width, value.height, value.channels);
-                }
-                else
-                {
-                    ImGui::Text("%s: %s", fieldName, fieldType.info().name().data());
-                }
-            }
-            else // smart pointer
-            {
-                if (fieldType == entt::resolve<std::shared_ptr<MMesh>>())
-                {
-                }
-                else if (fieldType == entt::resolve<std::shared_ptr<MMaterial>>())
-                {
+                    auto alebdoTextureMeta = entt::forward_as_meta(*value.Albedo);
+                    auto normalTextureMeta = entt::forward_as_meta(*value.Normal);
+                    auto armTextureMeta = entt::forward_as_meta(*value.ARM);
+                    auto emissiveTextureMeta = entt::forward_as_meta(*value.Emissive);
                     auto draggableTexture = [&](const char *label, const std::shared_ptr<MTexture> &texture,
                                                 std::function<void(std::shared_ptr<MTexture>)> onModified = nullptr) {
                         ImGui::Image(
                             reinterpret_cast<ImTextureID>(static_cast<VkDescriptorSet>(texture->GetImGuiTextureID())),
                             ImVec2(100, 100));
+
                         if (ImGui::BeginDragDropTarget())
                         {
                             if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload("ASSET"))
@@ -1386,6 +1540,59 @@ bool MEngineEditor::ReflectObject(entt::meta_any &instance, entt::meta_type type
                         ImGui::SameLine();
                         ImGui::Text("%s", label);
                     };
+                    // Albedo
+                    draggableTexture("Albedo", value.Albedo, [&](std::shared_ptr<MTexture> newTexture) {
+                        value.Albedo = newTexture;
+                        value.AlbedoID = newTexture->GetID();
+                        isModified = true;
+                        field.set(instance, value);
+                    });
+                    // Normal
+                    draggableTexture("Normal", value.Normal, [&](std::shared_ptr<MTexture> newTexture) {
+                        value.Normal = newTexture;
+                        value.NormalID = newTexture->GetID();
+                        isModified = true;
+                        field.set(instance, value);
+                    });
+                    // ARM
+                    draggableTexture("ARM", value.ARM, [&](std::shared_ptr<MTexture> newTexture) {
+                        value.ARM = newTexture;
+                        value.ARMID = newTexture->GetID();
+                        isModified = true;
+                        field.set(instance, value);
+                    });
+                    // Emissive
+                    draggableTexture("Emissive", value.Emissive, [&](std::shared_ptr<MTexture> newTexture) {
+                        value.Emissive = newTexture;
+                        value.EmissiveID = newTexture->GetID();
+                        isModified = true;
+                        field.set(instance, value);
+                    });
+                }
+                else if (fieldType == entt::resolve<vk::DescriptorSet>())
+                {
+                }
+                else
+                {
+                    ImGui::Text("%s: %s", fieldName, fieldType.info().name().data());
+                }
+            }
+            else // smart pointer
+            {
+                if (fieldType == entt::resolve<std::shared_ptr<MMesh>>())
+                {
+                }
+                else if (fieldType == entt::resolve<std::shared_ptr<MMaterial>>())
+                {
+                    auto draggableTexture = [&](const char *label, const std::shared_ptr<MTexture> &texture,
+                                                std::function<void(std::shared_ptr<MTexture>)> onModified = nullptr) {
+                        ImGui::Image(
+                            reinterpret_cast<ImTextureID>(static_cast<VkDescriptorSet>(texture->GetImGuiTextureID())),
+                            ImVec2(100, 100));
+
+                        ImGui::SameLine();
+                        ImGui::Text("%s", label);
+                    };
                     auto value = fieldValue.cast<std::shared_ptr<MMaterial>>();
                     // PBR Material
                     switch (value->GetMaterialType())
@@ -1393,44 +1600,10 @@ bool MEngineEditor::ReflectObject(entt::meta_any &instance, entt::meta_type type
                     case Core::Asset::MMaterialType::Unknown:
                     case Core::Asset::MMaterialType::PBR: {
                         auto pbrMaterial = std::static_pointer_cast<MPBRMaterial>(value);
-                        auto pbrProperties = pbrMaterial->GetProperties();
-                        auto pbrMaterialMeta = entt::forward_as_meta(pbrProperties);
-                        if (ImGui::CollapsingHeader("PBR Material Properties"))
+                        auto pbrMaterialMeta = entt::forward_as_meta(*pbrMaterial);
+                        if (ReflectObject(pbrMaterialMeta, entt::resolve<MPBRMaterial>()))
                         {
-
-                            if (ImGui::ColorEdit4("Albedo", glm::value_ptr(pbrProperties.Albedo),
-                                                  ImGuiColorEditFlags_HDR))
-                            {
-                                pbrMaterial->SetAlbedo(pbrProperties.Albedo);
-                                isModified = true;
-                            }
-                            if (ImGui::DragFloat("Metallic", &pbrProperties.Metallic, 0.01f, 0.0f, 1.0f))
-                            {
-                                pbrMaterial->SetMetallic(pbrProperties.Metallic);
-                                isModified = true;
-                            }
-                            if (ImGui::DragFloat("Roughness", &pbrProperties.Roughness, 0.01f, 0.0f, 1.0f))
-                            {
-                                pbrMaterial->SetRoughness(pbrProperties.Roughness);
-                                isModified = true;
-                            }
-                        }
-                        if (ImGui::CollapsingHeader("PBR Material Textures"))
-                        {
-                            auto pbrTextures = pbrMaterial->GetTextures();
-                            ImGui::Separator();
-                            draggableTexture("Albedo", pbrTextures.Albedo, [&](std::shared_ptr<MTexture> texture) {
-                                pbrMaterial->SetAlbedoTextureID(texture->GetID());
-                            });
-                            draggableTexture("Normal", pbrTextures.Normal, [&](std::shared_ptr<MTexture> texture) {
-                                pbrMaterial->SetNormalTextureID(texture->GetID());
-                            });
-                            draggableTexture("ARM", pbrTextures.ARM, [&](std::shared_ptr<MTexture> texture) {
-                                pbrMaterial->SetARMTextureID(texture->GetID());
-                            });
-                            draggableTexture("Emissive", pbrTextures.Emissive, [&](std::shared_ptr<MTexture> texture) {
-                                pbrMaterial->SetEmissiveTextureID(texture->GetID());
-                            });
+                            isModified = true;
                         }
                         break;
                     }
@@ -1442,13 +1615,10 @@ bool MEngineEditor::ReflectObject(entt::meta_any &instance, entt::meta_type type
                 else if (fieldType == entt::resolve<std::shared_ptr<MTexture>>())
                 {
                     auto value = fieldValue.cast<std::shared_ptr<MTexture>>();
-                    if (value->GetSetting().isShaderResource)
+                    auto textureMeta = entt::forward_as_meta(*value);
+                    if (ReflectObject(textureMeta, entt::resolve<MTexture>()))
                     {
-                        ImGui::Image(
-                            reinterpret_cast<ImTextureID>(static_cast<VkDescriptorSet>(value->GetImGuiTextureID())),
-                            ImVec2(100, 100));
-                        ImGui::SameLine();
-                        ImGui::Text("%s", fieldName);
+                        isModified = true;
                     }
                 }
                 else if (fieldType == entt::resolve<std::shared_ptr<MPipeline>>())
@@ -1463,6 +1633,7 @@ bool MEngineEditor::ReflectObject(entt::meta_any &instance, entt::meta_type type
             if (!fieldInfo->Editable)
                 ImGui::EndDisabled();
         }
+
         for (auto &&[id, baseType] : type.base())
         {
             isModified |= ReflectObject(instance, baseType);
@@ -1483,18 +1654,23 @@ void MEngineEditor::SetGLFWCallBacks()
         {
             auto path = std::filesystem::path{paths[i]};
             auto extension = path.extension();
-            auto fileName = path.filename().stem().string();
+            auto fileName = path.filename().replace_extension(".masset");
             if (extension == ".fbx")
             {
                 auto model = assetDatabase->LoadFBX(path);
-                assetDatabase->SaveAsset(model, instance->mCurrentFolder->GetPath() / fileName);
+                auto savePath = assetDatabase->GenerateUniqueAssetPath(instance->mCurrentFolder->GetPath() / fileName);
+                model->SetPath(savePath);
+                assetDatabase->SaveAsset(model);
             }
             else if (extension == ".png" || extension == ".jpg" || extension == ".jpeg")
             {
                 auto texture = assetDatabase->LoadPNG(path);
-                assetDatabase->SaveAsset(texture, instance->mCurrentFolder->GetPath() / fileName);
+                auto savePath = assetDatabase->GenerateUniqueAssetPath(instance->mCurrentFolder->GetPath() / fileName);
+                texture->SetPath(savePath);
+                assetDatabase->SaveAsset(texture);
             }
         }
     });
 }
+
 } // namespace MEngine::Editor

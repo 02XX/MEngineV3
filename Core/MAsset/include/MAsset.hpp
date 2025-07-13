@@ -1,6 +1,5 @@
 #pragma once
 #include "UUID.hpp"
-#include "VulkanContext.hpp"
 #include <filesystem>
 
 using namespace MEngine::Core;
@@ -48,43 +47,43 @@ class MAsset
     {
     }
     virtual ~MAsset() = default;
-    inline const UUID &GetID() const
+    virtual inline const UUID &GetID() const
     {
         return mID;
     }
-    inline void SetID(const UUID &id)
+    virtual inline void SetID(const UUID &id)
     {
         mID = id;
     }
-    inline MAssetType GetType() const
+    virtual inline MAssetType GetType() const
     {
         return mType;
     }
-    inline MAssetState GetState() const
+    virtual inline MAssetState GetState() const
     {
         return mState;
     }
-    inline void SetState(MAssetState state)
+    virtual inline void SetState(MAssetState state)
     {
         mState = state;
     }
-    inline void SetType(MAssetType type)
+    virtual inline void SetType(MAssetType type)
     {
         mType = type;
     }
-    inline const std::filesystem::path &GetPath() const
+    virtual inline const std::filesystem::path &GetPath() const
     {
         return mPath;
     }
-    inline void SetPath(const std::filesystem::path &path)
+    virtual inline void SetPath(const std::filesystem::path &path)
     {
         mPath = path;
     }
-    inline const std::string &GetName() const
+    virtual inline const std::string &GetName() const
     {
         return mName;
     }
-    inline void SetName(const std::string &name)
+    virtual inline void SetName(const std::string &name)
     {
         mName = name;
     }

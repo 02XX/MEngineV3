@@ -19,8 +19,7 @@ class MFolderManager final : public MManager<MFolder>, public IMFolderManager
     {
     }
     ~MFolderManager() override = default;
-    std::shared_ptr<MFolder> Create(const std::string &name, const UUID &parentFolderID,
-                                    const std::vector<UUID> &childrenIDs, const MFolderSetting &setting) override;
+    std::shared_ptr<MFolder> Create(const std::string &name, const MFolderSetting &setting) override;
     void Update(std::shared_ptr<MFolder> folder) override
     {
     }

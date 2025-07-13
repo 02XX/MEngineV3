@@ -132,9 +132,8 @@ class MEngineEditor
     void CreateFramebuffer();
     void CreateFences();
     void CreateSemaphores();
-    bool ReflectObject(entt::meta_any &instance, entt::meta_type type);
+    bool ReflectObject(entt::meta_any &instance, entt::meta_type type, bool head = true, std::string headName = {});
 
   private:
-
 };
 } // namespace MEngine::Editor

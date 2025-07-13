@@ -4,21 +4,9 @@
 
 namespace MEngine::Core::Manager
 {
-std::shared_ptr<MFolder> MFolderManager::Create(const std::string &name, const UUID &parentFolderID,
-                                                const std::vector<UUID> &childrenIDs, const MFolderSetting &setting)
+std::shared_ptr<MFolder> MFolderManager::Create(const std::string &name, const MFolderSetting &setting)
 {
-    auto folder = std::make_shared<MFolder>(mUUIDGenerator->Create(), name, parentFolderID, childrenIDs, setting);
-    // 设置导航属性
-    folder->mParentFolder = Get(parentFolderID);
-    if (folder->mParentFolder)
-    {
-        folder->mParentFolder->AddChild(folder);
-        folder->SetPath(folder->mParentFolder->GetPath() / folder->GetName());
-    }
-    else
-    {
-        folder->SetPath(folder->GetName());
-    }
+    auto folder = std::make_shared<MFolder>(mUUIDGenerator->Create(), name, setting);
     mAssets[folder->GetID()] = folder;
     return folder;
 }

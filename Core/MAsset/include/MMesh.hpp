@@ -3,10 +3,12 @@
 #include "MManager_fwd.hpp"
 #include "VMA.hpp"
 #include "Vertex.hpp"
+#include "VulkanContext.hpp"
 #include <cstdint>
 #include <nlohmann/json_fwd.hpp>
 #include <vector>
 #include <vulkan/vulkan_handles.hpp>
+
 
 namespace MEngine::Core::Asset
 {

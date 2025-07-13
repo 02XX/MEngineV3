@@ -7,6 +7,7 @@
 #include "ResourceManager.hpp"
 #include "Serialize.hpp"
 #include "UUID.hpp"
+#include <algorithm>
 #include <concepts>
 #include <filesystem>
 #include <fstream>
@@ -57,48 +58,48 @@ class AssetDatabase
         auto asset = LoadAsset(path);
         return std::static_pointer_cast<TAsset>(asset);
     }
-    template <std::derived_from<MAsset> TAsset>
-    void SaveAsset(std::shared_ptr<TAsset> asset, const std::filesystem::path &path)
+    template <std::derived_from<MAsset> TAsset> void SaveAsset(std::shared_ptr<TAsset> asset)
     {
-        auto savePath = path;
-        if (savePath.has_extension())
+        if (asset->GetPath().empty())
         {
-            savePath.replace_extension(".masset");
+            LogError("Asset path is NOT set. Cannot save asset without a valid path.");
+            throw std::runtime_error("Asset path is empty. Cannot save asset without a valid path.");
         }
-        else
+        if (!asset->GetPath().has_extension() || asset->GetPath().extension() != ".masset")
         {
-            savePath += ".masset";
+            LogError("Asset path {} does not have a valid extension. Expected .masset.", asset->GetPath().string());
+            throw std::runtime_error("Asset path does not have a valid extension. Expected .masset.");
         }
-        auto uniquePath = GenerateUniqueAssetPath(savePath);
-        std::ofstream file(uniquePath, std::ios::binary);
+        auto savePath = asset->GetPath();
+        std::ofstream file(savePath, std::ios::binary);
         if (!file.is_open())
         {
-            throw std::runtime_error("Failed to open asset file for writing: " + uniquePath.string());
+            throw std::runtime_error("Failed to open asset file for writing: " + savePath.string());
         }
-        asset->SetPath(uniquePath);
-        asset->SetName(uniquePath.filename().stem().string());
+        asset->SetPath(savePath);
+        asset->SetName(savePath.filename().stem().string());
         json j = *asset;
         auto msgPack = json::to_msgpack(j);
         file.write(reinterpret_cast<const char *>(msgPack.data()), msgPack.size());
         file.close();
         auto folderManager = mResourceManager->GetManager<MFolder, IMFolderManager>();
-        auto parentFolder = folderManager->Get(mPath2UUID[uniquePath.parent_path()]);
+        auto parentFolder = folderManager->Get(mPath2UUID[savePath.parent_path()]);
         if (parentFolder != nullptr)
         {
-            parentFolder->AddChild(asset);
+            if (std::ranges::find(parentFolder->GetChildren(), asset) == parentFolder->GetChildren().end())
+            {
+                parentFolder->AddChild(asset);
+            }
         }
         mPath2UUID[asset->GetPath()] = asset->GetID();
     }
-
-    std::shared_ptr<MFolder> CreateFolder(const std::filesystem::path &parentPath,
-                                          const std::string &newFolderName = "New Folder",
-                                          const MFolderSetting &setting = {});
     void DeleteFolder(const std::filesystem::path &directory);
     std::shared_ptr<MFolder> LoadFolder(const std::filesystem::path &directory);
-    void SaveFolder(std::shared_ptr<MFolder> folder, const std::filesystem::path &directory);
+    void SaveFolder(std::shared_ptr<MFolder> folder);
     // Operations
     std::filesystem::path GenerateUniqueAssetPath(std::filesystem::path path);
-    void MoveAsset(const std::filesystem::path &srcPath, const std::filesystem::path &dstPath);
+
+    void MoveAsset(std::shared_ptr<MAsset> asset, std::shared_ptr<MFolder> dstFolder);
     void RenameAsset(const std::filesystem::path &path, const std::string &newName);
     void CopyAsset(const std::filesystem::path &srcPath, const std::filesystem::path &dstPath);
 

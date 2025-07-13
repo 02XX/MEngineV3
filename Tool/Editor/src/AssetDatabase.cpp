@@ -3,9 +3,7 @@
 #include "Logger.hpp"
 #include "MAsset.hpp"
 #include "MFolder.hpp"
-
 #include "MMesh.hpp"
-#include "MMeshManager.hpp"
 #include "MModel.hpp"
 #include "MPBRMaterial.hpp"
 #include "MPipeline.hpp"
@@ -25,26 +23,17 @@
 
 namespace MEngine::Editor
 {
-std::shared_ptr<MFolder> AssetDatabase::CreateFolder(const std::filesystem::path &parentPath,
-                                                     const std::string &newFolderName, const MFolderSetting &setting)
+void AssetDatabase::SaveFolder(std::shared_ptr<MFolder> folder)
 {
     auto folderManager = mResourceManager->GetManager<MFolder, IMFolderManager>();
-    auto uniquePath = GenerateUniqueAssetPath(parentPath / newFolderName);
-    UUID parentID{};
-    if (mPath2UUID.contains(uniquePath.parent_path()))
+    if (mPath2UUID.contains(folder->GetPath().parent_path()))
     {
-        parentID = mPath2UUID[uniquePath.parent_path()];
+        auto parentFolder = folderManager->Get(mPath2UUID.at(folder->GetPath().parent_path()));
+        folder->SetParentFolder(parentFolder);
+        parentFolder->AddChild(folder);
     }
-    auto parentFolder = folderManager->Get(parentID);
-    parentID = parentFolder ? parentFolder->GetID() : UUID{};
-    auto folder = folderManager->Create(uniquePath.filename().stem().string(), parentID, {}, setting);
     mPath2UUID[folder->GetPath()] = folder->GetID();
-    return folder;
-}
-void AssetDatabase::SaveFolder(std::shared_ptr<MFolder> folder, const std::filesystem::path &directory)
-{
-    auto uniquePath = GenerateUniqueAssetPath(directory / folder->GetName());
-    std::filesystem::create_directories(uniquePath);
+    std::filesystem::create_directories(folder->GetPath());
 }
 void AssetDatabase::DeleteFolder(const std::filesystem::path &path)
 {
@@ -77,8 +66,41 @@ void AssetDatabase::DeleteAsset(const std::filesystem::path &path)
         LogError("Path {} not found in AssetDatabase.", path.string());
     }
 }
-void AssetDatabase::MoveAsset(const std::filesystem::path &srcPath, const std::filesystem::path &dstPath)
+void AssetDatabase::MoveAsset(std::shared_ptr<MAsset> asset, std::shared_ptr<MFolder> dstFolder)
 {
+    if (!mPath2UUID.contains(asset->GetPath()))
+    {
+        LogError("Source path {} not found in AssetDatabase.", asset->GetPath().string());
+        return;
+    }
+    if (!mPath2UUID.contains(asset->GetPath().parent_path()))
+    {
+        LogError("Destination parent path {} not found in AssetDatabase.", asset->GetPath().parent_path().string());
+        return;
+    }
+    auto fileName = asset->GetPath().filename();
+    auto newPath = dstFolder->GetPath() / fileName;
+    if (std::filesystem::exists(newPath))
+    {
+        LogError("Destination path {} already exists.", newPath.string());
+        return;
+    }
+    auto parentFolder =
+        mResourceManager->GetManager<MFolder, IMFolderManager>()->Get(mPath2UUID[asset->GetPath().parent_path()]);
+    if (parentFolder)
+    {
+        parentFolder->RemoveChild(asset);
+    }
+    dstFolder->AddChild(asset);
+    if (asset->GetType() == Core::Asset::MAssetType::Folder)
+    {
+        std::dynamic_pointer_cast<MFolder>(asset)->SetParentFolder(dstFolder);
+    }
+    // 移动
+    std::filesystem::rename(asset->GetPath(), newPath);
+    mPath2UUID.erase(asset->GetPath());
+    asset->SetPath(newPath);
+    mPath2UUID[newPath] = asset->GetID();
 }
 void AssetDatabase::RenameAsset(const std::filesystem::path &path, const std::string &newName)
 {
@@ -115,14 +137,46 @@ std::shared_ptr<MAsset> AssetDatabase::LoadAsset(const std::filesystem::path &pa
         auto textureSetting = MTextureSetting{};
         j["setting"].get_to(textureSetting);
         auto texture = textureManager->Create("New Texture", {1, 1, 4}, textureManager->GetWhiteData(), textureSetting);
+        textureManager->Remove(texture->GetID());
         j.get_to<MTexture>(*texture);
         textureManager->Update(texture);
         textureManager->CreateVulkanResources(texture);
-        textureManager->Write(texture);
+        if (!texture->GetImageData().empty())
+        {
+            textureManager->Write(texture);
+        }
         asset = texture;
         break;
     }
-    case Core::Asset::MAssetType::Material:
+    case Core::Asset::MAssetType::Material: {
+        auto materialTypeStr = j["materialType"].get<std::string>();
+        auto materialType = magic_enum::enum_cast<Core::Asset::MMaterialType>(materialTypeStr).value();
+        switch (materialType)
+        {
+        case Core::Asset::MMaterialType::Unknown:
+        case Core::Asset::MMaterialType::PBR: {
+            auto pbrMaterialManager = mResourceManager->GetManager<MPBRMaterial, IMPBRMaterialManager>();
+            auto pbrMaterialSetting = MPBRMaterialSetting{};
+            auto pbrMaterialProperties = MPBRMaterialProperties{};
+            auto pbrMaterialTextures = MPBRTextures{};
+            j["setting"].get_to(pbrMaterialSetting);
+            auto pbrMaterial =
+                pbrMaterialManager->Create("New PBR Material", PipelineType::ForwardOpaquePBR, pbrMaterialProperties,
+                                           pbrMaterialTextures, pbrMaterialSetting);
+            pbrMaterialManager->Remove(pbrMaterial->GetID());
+            j.get_to(*pbrMaterial);
+            pbrMaterialManager->Update(pbrMaterial);
+            pbrMaterialManager->CreateVulkanResources(pbrMaterial);
+            pbrMaterialManager->Write(pbrMaterial);
+            asset = pbrMaterial;
+            break;
+        }
+        case Core::Asset::MMaterialType::Unlit:
+        case Core::Asset::MMaterialType::Custom:
+            break;
+        }
+        break;
+    }
     case Core::Asset::MAssetType::Mesh:
     case Core::Asset::MAssetType::Shader: {
         auto pipelineManager = mResourceManager->GetManager<MPipeline, IMPipelineManager>();
@@ -168,11 +222,6 @@ std::shared_ptr<MAsset> AssetDatabase::LoadAsset(const std::filesystem::path &pa
                 auto name = materialJson["name"].get<std::string>();
                 auto pbrMaterialProperties = MPBRMaterialProperties{};
                 auto pbrMaterialTextures = MPBRTextures{};
-                // pbrMaterialTextures.AlbedoID =
-                // textureManager->GetDefaultTexture(DefaultTextureType::Albedo)->GetID(); pbrMaterialTextures.NormalID
-                // = textureManager->GetDefaultTexture(DefaultTextureType::Normal)->GetID(); pbrMaterialTextures.ARMID =
-                // textureManager->GetDefaultTexture(DefaultTextureType::ARM)->GetID(); pbrMaterialTextures.EmissiveID =
-                //     textureManager->GetDefaultTexture(DefaultTextureType::Emissive)->GetID();
                 auto pbrMaterial = materialManager->Create(name, PipelineType::ForwardOpaquePBR, pbrMaterialProperties,
                                                            pbrMaterialTextures, materialSetting);
                 pbrMaterialManager->Remove(pbrMaterial->GetID());
@@ -189,6 +238,7 @@ std::shared_ptr<MAsset> AssetDatabase::LoadAsset(const std::filesystem::path &pa
         }
         j["setting"].get_to(modelSetting);
         auto model = modelManager->Create("New Model", {}, {}, nullptr, modelSetting);
+        modelManager->Remove(model->GetID());
         j.get_to(*model);
         modelManager->Update(model);
         modelManager->CreateVulkanResources(model);
@@ -224,7 +274,14 @@ std::shared_ptr<MFolder> AssetDatabase::LoadFolder(const std::filesystem::path &
         return nullptr;
     }
     MFolderSetting folderSetting{};
-    auto folder = CreateFolder(directory.parent_path(), directory.filename().string(), folderSetting);
+    auto folderManager = mResourceManager->GetManager<MFolder, IMFolderManager>();
+    auto folder = folderManager->Create(directory.filename().stem().string(), folderSetting);
+    if (mPath2UUID.contains(directory.parent_path()))
+    {
+        auto parentFolder = folderManager->Get(mPath2UUID.at(directory.parent_path()));
+        folder->SetParentFolder(parentFolder);
+        parentFolder->AddChild(folder);
+    }
     folder->SetPath(directory);
     mPath2UUID[directory] = folder->GetID();
     return folder;
@@ -295,11 +352,10 @@ std::shared_ptr<MModel> AssetDatabase::LoadFBX(const std::filesystem::path &path
         auto name = node->mName.C_Str();
         auto transform = node->mTransformation;
         modelNode->Name = name ? name : "Unnamed Node";
-        // modelNode->Transform =
-        //     glm::mat4(transform.a1, transform.b1, transform.c1, transform.d1, transform.a2, transform.b2,
-        //     transform.c2,
-        //               transform.d2, transform.a3, transform.b3, transform.c3, transform.d3, transform.a4,
-        //               transform.b4, transform.c4, transform.d4);
+        modelNode->Transform =
+            glm::mat4(transform.a1, transform.b1, transform.c1, transform.d1, transform.a2, transform.b2, transform.c2,
+                      transform.d2, transform.a3, transform.b3, transform.c3, transform.d3, transform.a4, transform.b4,
+                      transform.c4, transform.d4);
         for (unsigned int i = 0; i < node->mNumMeshes; i++)
         {
             aiMesh *mesh = scene->mMeshes[node->mMeshes[i]];
@@ -365,8 +421,6 @@ std::shared_ptr<MModel> AssetDatabase::LoadFBX(const std::filesystem::path &path
     auto rootNoe = processNode(scene->mRootNode, nullptr);
     auto modelSetting = MModelSetting{};
     auto model = modelManager->Create(sceneName, meshIDs, materialIDs, std::move(rootNoe), modelSetting);
-    model->SetPath(std::filesystem::path(path).parent_path() / path.filename().replace_extension(".masset"));
-    mPath2UUID[model->GetPath()] = model->GetID();
     return model;
 }
 std::shared_ptr<MTexture> AssetDatabase::LoadPNG(const std::filesystem::path &path)
@@ -379,26 +433,6 @@ std::shared_ptr<MTexture> AssetDatabase::LoadPNG(const std::filesystem::path &pa
     auto extension = path.extension().string();
     auto fileName = path.filename().stem().string();
     auto textureManager = mResourceManager->GetManager<MTexture, IMTextureManager>();
-    // stbi_set_flip_vertically_on_load(true);
-    // int width, height, channels;
-    // auto data = stbi_load(path.string().c_str(), &width, &height, &channels, STBI_rgb_alpha);
-    // if (!data)
-    // {
-    //     LogError("Failed to load PNG image: {}", path.string());
-    //     return nullptr;
-    // }
-    // std::vector<uint8_t> imageData(width * height * 4); // 使用RGBA格式
-    // if (channels == 3)
-    // { // 如果是RGB，手动转RGBA
-    //     for (int i = 0; i < width * height; ++i)
-    //     {
-    //         imageData[i * 4 + 0] = data[i * 3 + 0]; // R
-    //         imageData[i * 4 + 1] = data[i * 3 + 1]; // G
-    //         imageData[i * 4 + 2] = data[i * 3 + 2]; // B
-    //         imageData[i * 4 + 3] = 255;             // A (不透明)
-    //     }
-    //     channels = 4;
-    // }
     auto &&[width, height, channels, imageData] = MEngine::Core::Utils::ImageUtil::LoadImage(path);
     auto textureSetting = MTextureSetting{};
     textureSetting.isShaderResource = true;
@@ -407,8 +441,6 @@ std::shared_ptr<MTexture> AssetDatabase::LoadPNG(const std::filesystem::path &pa
         imageData, textureSetting);
     textureManager->CreateVulkanResources(texture);
     textureManager->Write(texture);
-    texture->SetPath(path);
-    mPath2UUID[path] = texture->GetID();
     return texture;
 }
 } // namespace MEngine::Editor
