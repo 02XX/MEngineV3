@@ -161,12 +161,12 @@ void main()
     float roughness = arm.g * materialParameters.parameters.Roughness;
     float metallic = arm.b * materialParameters.parameters.Metallic;
     vec4 finalColor = vec4(0.0, 0.0, 0.0, 1.0);
-    int lightCount = 0;
-    vec3 F0 = mix(vec3(0.04), albedoColor, metallic);
-    vec3 N = normalize(normalColor * 2.0 - 1.0);
     vec3 VIEW = -fragViewPosition; // 相机空间
     vec3 V = normalize(VIEW);
+    vec3 N = normalize(normalColor * 2.0 - 1.0);
+    vec3 F0 = mix(vec3(0.04), albedoColor, metallic);
     float NoV = clamp(dot(N, V), 0, 1.0f);
+    int lightCount = 0;
     for (int i = 0; i < MAX_LIGHT_COUNT; i++)
     {
         if (lights.parameters[i].Enable == 0)
@@ -194,7 +194,6 @@ void main()
                 vec3 kD = vec3(1.0) - kS;
                 kD *= 1.0 - metallic;
                 finalColor += vec4((kD * albedoColor / PI + specular) * (LIGHT_COLOR)*NoL, 1.0);
-                // finalColor = vec4(lights.parameters[0].Color, 1.0);
             }
         }
         else if (lights.parameters[i].LightType == 1) // 点光源
@@ -217,7 +216,7 @@ void main()
     kD *= 1.0 - metallic;
     vec3 diffuse = irradiance * albedoColor * kD;
     vec3 specular = environmentRadiance * (F0 * brdf.x + brdf.y);
-    vec3 ambient = diffuse + specular;
+    vec3 ambient = kD * diffuse + kS * specular;
     finalColor += vec4(ambient, 1.0) * ao;
     OutColor = finalColor;
 }
