@@ -40,7 +40,7 @@ vk::ImageUsageFlags MTextureManager::PickImageUsage(const MTextureSetting &setti
     vk::ImageUsageFlags ret = vk::ImageUsageFlagBits::eTransferSrc | vk::ImageUsageFlagBits::eTransferDst;
 
     if (setting.isShaderResource)
-        ret |= vk::ImageUsageFlagBits::eSampled;
+        ret |= vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eInputAttachment;
 
     if (setting.isRenderTarget)
     {
@@ -456,10 +456,10 @@ void MTextureManager::CreateDefault()
     auto whiteTexture = CreateWhiteTexture();
     auto blackTexture = CreateBlackTexture();
     auto magentaTexture = CreateMagentaTexture();
-    auto normalTexture = CreateNormalTexture();
-    auto emissiveTexture = CreateEmissiveTexture();
-    auto albedoTexture = CreateAlbedoTexture();
-    auto armTexture = CreateARMTexture();
+    auto normalTexture = CreateNormalTexture(1, 1);
+    auto emissiveTexture = CreateEmissiveTexture(1, 1);
+    auto albedoTexture = CreateAlbedoTexture(1, 1);
+    auto armTexture = CreateARMTexture(1, 1);
     auto environmentMap = CreateEnvironmentMap();
     auto irradianceMap = CreateIrradianceMap();
     auto brdfLUT = CreateBRDFLUT();
@@ -519,34 +519,35 @@ std::shared_ptr<MTexture> MTextureManager::CreateBlackTexture()
     Write(blackTexture);
     return blackTexture;
 }
-std::shared_ptr<MTexture> MTextureManager::CreateNormalTexture()
+std::shared_ptr<MTexture> MTextureManager::CreateNormalTexture(uint32_t width, uint32_t height)
 {
     auto normalTextureSetting = MTextureSetting();
-    auto normalTexture = Create("Default Normal Texture", {1, 1, 4}, GetNormalData(), normalTextureSetting);
+    auto normalTexture = Create("Default Normal Texture", {width, height, 4}, GetNormalData(), normalTextureSetting);
     CreateVulkanResources(normalTexture);
     Write(normalTexture);
     return normalTexture;
 }
-std::shared_ptr<MTexture> MTextureManager::CreateEmissiveTexture()
+std::shared_ptr<MTexture> MTextureManager::CreateEmissiveTexture(uint32_t width, uint32_t height)
 {
     auto emissiveTextureSetting = MTextureSetting();
-    auto emissiveTexture = Create("Default Emissive Texture", {1, 1, 4}, GetEmissiveData(), emissiveTextureSetting);
+    auto emissiveTexture =
+        Create("Default Emissive Texture", {width, height, 4}, GetEmissiveData(), emissiveTextureSetting);
     CreateVulkanResources(emissiveTexture);
     Write(emissiveTexture);
     return emissiveTexture;
 }
-std::shared_ptr<MTexture> MTextureManager::CreateAlbedoTexture()
+std::shared_ptr<MTexture> MTextureManager::CreateAlbedoTexture(uint32_t width, uint32_t height)
 {
     auto albedoTextureSetting = MTextureSetting();
-    auto albedoTexture = Create("Default Albedo Texture", {1, 1, 4}, GetAlbedoData(), albedoTextureSetting);
+    auto albedoTexture = Create("Default Albedo Texture", {width, height, 4}, GetAlbedoData(), albedoTextureSetting);
     CreateVulkanResources(albedoTexture);
     Write(albedoTexture);
     return albedoTexture;
 }
-std::shared_ptr<MTexture> MTextureManager::CreateARMTexture()
+std::shared_ptr<MTexture> MTextureManager::CreateARMTexture(uint32_t width, uint32_t height)
 {
     auto armTextureSetting = MTextureSetting();
-    auto armTexture = Create("Default ARM Texture", {1, 1, 4}, GetARMData(), armTextureSetting);
+    auto armTexture = Create("Default ARM Texture", {width, height, 4}, GetARMData(), armTextureSetting);
     CreateVulkanResources(armTexture);
     Write(armTexture);
     return armTexture;

@@ -95,7 +95,13 @@ void MEngineEditor::Init()
     InitSystem();
     mIsRunning = true;
     auto modelManager = injector.create<std::shared_ptr<IMModelManager>>();
+    auto materialManager = injector.create<std::shared_ptr<IMPBRMaterialManager>>();
     auto cube = modelManager->CreateCube();
+    auto deferredMaterial = materialManager->Create("DeferredMaterial", PipelineType::GBuffer, MPBRMaterialProperties{},
+                                                    MPBRTextures{}, MPBRMaterialSetting{});
+    materialManager->CreateVulkanResources(deferredMaterial);
+    materialManager->Write(deferredMaterial);
+    cube->SetMaterials({deferredMaterial});
     auto registry = injector.create<std::shared_ptr<entt::registry>>();
     auto cubeGameObject = Function::Utils::EntityUtils::CreateEntity(registry, cube);
     auto &cubeTransform = registry->get<MTransformComponent>(cubeGameObject);

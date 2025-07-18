@@ -50,10 +50,10 @@ class MTextureManager final : public MManager<MTexture>, public IMTextureManager
     std::shared_ptr<MTexture> CreateWhiteTexture() override;
     std::shared_ptr<MTexture> CreateBlackTexture() override;
     std::shared_ptr<MTexture> CreateMagentaTexture() override;
-    std::shared_ptr<MTexture> CreateNormalTexture() override;
-    std::shared_ptr<MTexture> CreateEmissiveTexture() override;
-    std::shared_ptr<MTexture> CreateAlbedoTexture() override;
-    std::shared_ptr<MTexture> CreateARMTexture() override;
+    std::shared_ptr<MTexture> CreateNormalTexture(uint32_t width, uint32_t height) override;
+    std::shared_ptr<MTexture> CreateEmissiveTexture(uint32_t width, uint32_t height) override;
+    std::shared_ptr<MTexture> CreateAlbedoTexture(uint32_t width, uint32_t height) override;
+    std::shared_ptr<MTexture> CreateARMTexture(uint32_t width, uint32_t height) override;
     std::shared_ptr<MTexture> CreateEnvironmentMap() override;
     std::shared_ptr<MTexture> CreateIrradianceMap() override;
     std::shared_ptr<MTexture> CreateBRDFLUT() override;

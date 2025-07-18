@@ -41,32 +41,26 @@ class MRenderSystem final : public MSystem
         uint32_t height{720};
         // Render target 0: Color
         std::shared_ptr<MTexture> colorTexture;
-
         // Render target 1: Depth/Stencil
         std::shared_ptr<MTexture> depthStencilTexture;
-
-        // // Render target 2: Albedo
-        // std::shared_ptr<MTexture> albedoTexture;
-        // vk::ClearValue albedoClearValue{vk::ClearColorValue(std::array<float, 4>{0.0f, 0.0f, 0.0f, 1.0f})};
-        // // Render target 3: Normal
-        // std::shared_ptr<MTexture> normalTexture;
-        // vk::ClearValue normalClearValue{vk::ClearColorValue(std::array<float, 4>{0.0f, 0.0f, 1.0f, 1.0f})};
-        // // Render target 4: WorldPos
-        // std::shared_ptr<MTexture> worldPosTexture;
-        // vk::ClearValue worldPosClearValue{vk::ClearColorValue(std::array<float, 4>{0.0f, 0.0f, 0.0f, 1.0f})};
-        // // Render target 5: ARM (Ambient Occlusion, Roughness, Metallic)
-        // std::shared_ptr<MTexture> armTexture;
-        // vk::ClearValue armClearValue{vk::ClearColorValue(std::array<float, 4>{0.0f, 0.0f, 0.0f, 1.0f})};
-        // // Render target 6: Emissive
+        // Render target 2: Normal
+        std::shared_ptr<MTexture> normalTexture;
+        // Render target 3: ARM (Ambient Occlusion, Roughness, Metallic)
+        std::shared_ptr<MTexture> armTexture;
+        // Render target 4: WorldPos
+        std::shared_ptr<MTexture> worldPosTexture;
+        // Render target 5: Emissive
         // Asset::MTexture emissiveTexture;
         // vk::ClearValue emissiveClearValue{vk::ClearColorValue(std::array<float, 4>{0.0f, 0.0f, 0.0f, 1.0f})};
         static std::vector<vk::ClearValue> GetClearValues()
         {
             vk::ClearValue colorClearValue{vk::ClearColorValue(std::array<float, 4>{0.1f, 0.1f, 0.1f, 1.0f})};
             vk::ClearValue depthClearValue{vk::ClearDepthStencilValue(1.0f, 0)};
+            vk::ClearValue normalClearValue{vk::ClearColorValue(std::array<float, 4>{0.0f, 0.0f, 1.0f, 1.0f})};
+            vk::ClearValue armClearValue{vk::ClearColorValue(std::array<float, 4>{0.0f, 0.0f, 0.0f, 1.0f})};
+            vk::ClearValue worldPosClearValue{vk::ClearColorValue(std::array<float, 4>{0.0f, 0.0f, 0.0f, 1.0f})};
             return {
-                colorClearValue, depthClearValue
-                // , albedoClearValue, normalClearValue, worldPosClearValue, armClearValue, emissiveClearValue
+                colorClearValue, depthClearValue, normalClearValue, worldPosClearValue, armClearValue,
             };
         }
         inline vk::Extent3D GetExtent() const
@@ -164,6 +158,8 @@ class MRenderSystem final : public MSystem
     void CreateEnvironmentMap();
     void Batch();
     void Prepare();
+    void GBufferPass();
+    void LightingPass();
     void RenderForwardCompositePass();
     void RenderSkyPass();
     void End();

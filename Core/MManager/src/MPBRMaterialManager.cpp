@@ -137,4 +137,12 @@ std::shared_ptr<MPBRMaterial> MPBRMaterialManager::CreateDefaultForwardOpaquePBR
     Write(defaultPBRMaterial);
     return defaultPBRMaterial;
 }
+std::shared_ptr<MPBRMaterial> MPBRMaterialManager::CreateLightMaterial()
+{
+    auto lightMaterial = Create("Light Material", PipelineType::Lighting, MPBRMaterialProperties{}, MPBRTextures{},
+                                MPBRMaterialSetting{});
+    CreateVulkanResources(lightMaterial);
+    Write(lightMaterial);
+    return lightMaterial;
+}
 } // namespace MEngine::Core::Manager

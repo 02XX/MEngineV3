@@ -87,8 +87,14 @@ void MRenderSystem::Init()
 void MRenderSystem::Update(float deltaTime)
 {
     Batch();
+    auto commandBuffer = mGraphicsCommandBuffers[mCurrentFrameIndex].get();
     Prepare();
+    GBufferPass();
+    commandBuffer.nextSubpass(vk::SubpassContents::eInline);
+    LightingPass();
+    commandBuffer.nextSubpass(vk::SubpassContents::eInline);
     RenderForwardCompositePass();
+    commandBuffer.nextSubpass(vk::SubpassContents::eInline);
     RenderSkyPass();
     End();
     mCurrentFrameIndex = (mCurrentFrameIndex + 1) % mFrameCount;
@@ -114,6 +120,12 @@ void MRenderSystem::CreateRenderTarget()
             textureManager->CreateColorAttachment(mRenderTargets[i].width, mRenderTargets[i].height);
         mRenderTargets[i].depthStencilTexture =
             textureManager->CreateDepthStencilAttachment(mRenderTargets[i].width, mRenderTargets[i].height);
+        mRenderTargets[i].normalTexture =
+            textureManager->CreateColorAttachment(mRenderTargets[i].width, mRenderTargets[i].height);
+        mRenderTargets[i].armTexture =
+            textureManager->CreateColorAttachment(mRenderTargets[i].width, mRenderTargets[i].height);
+        mRenderTargets[i].worldPosTexture =
+            textureManager->CreateColorAttachment(mRenderTargets[i].width, mRenderTargets[i].height);
     }
 }
 void MRenderSystem::CreateFramebuffer()
@@ -124,6 +136,9 @@ void MRenderSystem::CreateFramebuffer()
         std::vector<vk::ImageView> attachments;
         attachments.push_back(mRenderTargets[i].colorTexture->GetImageView());
         attachments.push_back(mRenderTargets[i].depthStencilTexture->GetImageView());
+        attachments.push_back(mRenderTargets[i].normalTexture->GetImageView());
+        attachments.push_back(mRenderTargets[i].armTexture->GetImageView());
+        attachments.push_back(mRenderTargets[i].worldPosTexture->GetImageView());
         // 创建Framebuffer
         vk::FramebufferCreateInfo framebufferCreateInfo;
         framebufferCreateInfo.setRenderPass(mRenderPassManager->GetCompositionRenderPass())
@@ -244,6 +259,65 @@ void MRenderSystem::Prepare()
         .setClearValues(clearValues);
     commandBuffer.beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
 }
+void MRenderSystem::GBufferPass()
+{
+    auto commandBuffer = mGraphicsCommandBuffers[mCurrentFrameIndex].get();
+    auto globalDescriptorSet = mGlobalDescriptorSets[mCurrentFrameIndex].get();
+    for (const auto &[pipeline, entities] : mRenderQueue[RenderPassType::GBuffer])
+    {
+        commandBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline->GetPipeline());
+        for (auto entity : entities)
+        {
+            // 1. 绑定 pipeline
+            commandBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline->GetPipeline());
+            // 2. 绑定Global描述符集
+            commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipeline->GetPipelineLayout(), 0,
+                                             globalDescriptorSet, {});
+            for (auto entity : entities)
+            {
+                auto &materialComponent = mRegistry->get<MMaterialComponent>(entity);
+                auto &meshComponent = mRegistry->get<MMeshComponent>(entity);
+                auto &transformComponent = mRegistry->get<MTransformComponent>(entity);
+                // 3. 绑定 push_constants
+                commandBuffer.pushConstants(pipeline->GetPipelineLayout(),
+                                            vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment, 0,
+                                            sizeof(glm::mat4), &transformComponent.modelMatrix);
+                // 4. 绑定材质描述符集
+                commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipeline->GetPipelineLayout(), 1,
+                                                 materialComponent.material->GetMaterialDescriptorSet(), {});
+                // 5. 绑定顶点缓冲区
+                auto vertexBuffer = meshComponent.mesh->GetVertexBuffer();
+                commandBuffer.bindVertexBuffers(0, vertexBuffer, {0});
+                // 6. 绑定索引缓冲区
+                auto indexBuffer = meshComponent.mesh->GetIndexBuffer();
+                commandBuffer.bindIndexBuffer(indexBuffer, 0, vk::IndexType::eUint32);
+                // 7. 绘制Draw Call
+                commandBuffer.drawIndexed(meshComponent.mesh->GetIndexCount(), 1, 0, 0, 0);
+            }
+        }
+    }
+}
+void MRenderSystem::LightingPass()
+{
+
+    auto commandBuffer = mGraphicsCommandBuffers[mCurrentFrameIndex].get();
+    auto globalDescriptorSet = mGlobalDescriptorSets[mCurrentFrameIndex].get();
+    auto pipeline = mPipelineManager->GetByName(PipelineType::Lighting);
+    commandBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline->GetPipeline());
+    // 绑定全局描述符集
+    commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipeline->GetPipelineLayout(), 0,
+                                     globalDescriptorSet, {});
+    auto fullscreenTriangleMesh =
+        mResourceManager->GetManager<MMesh, IMMeshManager>()->GetMesh(DefaultMeshType::FullscreenTriangle);
+    // 绑定全屏三角形网格
+    auto vertexBuffer = fullscreenTriangleMesh->GetVertexBuffer();
+    commandBuffer.bindVertexBuffers(0, vertexBuffer, {0});
+    // 绑定索引缓冲区
+    auto indexBuffer = fullscreenTriangleMesh->GetIndexBuffer();
+    commandBuffer.bindIndexBuffer(indexBuffer, 0, vk::IndexType::eUint32);
+    // 绘制全屏三角形
+    commandBuffer.drawIndexed(fullscreenTriangleMesh->GetIndexCount(), 1, 0, 0, 0);
+}
 void MRenderSystem::RenderForwardCompositePass()
 {
     auto commandBuffer = mGraphicsCommandBuffers[mCurrentFrameIndex].get();
@@ -278,8 +352,6 @@ void MRenderSystem::RenderForwardCompositePass()
             commandBuffer.drawIndexed(meshComponent.mesh->GetIndexCount(), 1, 0, 0, 0);
         }
     }
-    // commandBuffer.nextSubpass(vk::SubpassContents::eInline);
-    commandBuffer.nextSubpass(vk::SubpassContents::eInline);
 }
 void MRenderSystem::RenderSkyPass()
 {
@@ -383,4 +455,5 @@ void MRenderSystem::WriteGlobalDescriptorSet(uint32_t globalDescriptorSetIndex)
 
     mVulkanContext->GetDevice().updateDescriptorSets(writeDescriptorSets, {});
 }
+
 } // namespace MEngine::Function::System

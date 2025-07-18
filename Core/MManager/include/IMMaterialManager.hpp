@@ -9,6 +9,7 @@ template <std::derived_from<MMaterial> TAsset> class IMMaterialManager : public 
 {
   public:
     ~IMMaterialManager() override = default;
+    virtual std::shared_ptr<TAsset> CreateLightMaterial() = 0;
     virtual void Write(std::shared_ptr<TAsset> material) = 0;
 };
 } // namespace MEngine::Core::Manager

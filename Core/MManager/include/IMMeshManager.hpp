@@ -14,6 +14,7 @@ enum class DefaultMeshType
     Plane,
     Cylinder,
     Sky,
+    FullscreenTriangle // 用于后处理的全屏三角形
 };
 class IMMeshManager : public virtual IMManager<MMesh>
 {
@@ -27,6 +28,7 @@ class IMMeshManager : public virtual IMManager<MMesh>
     virtual std::shared_ptr<MMesh> CreatePlaneMesh() = 0;
     virtual std::shared_ptr<MMesh> CreateCylinderMesh() = 0;
     virtual std::shared_ptr<MMesh> CreateSkyMesh() = 0;
+    virtual std::shared_ptr<MMesh> CreateFullscreenTriangleMesh() = 0;
     virtual std::shared_ptr<MMesh> GetMesh(DefaultMeshType type) const = 0;
 };
 } // namespace MEngine::Core::Manager

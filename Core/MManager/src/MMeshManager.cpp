@@ -141,22 +141,26 @@ void MMeshManager::CreateDefault()
     auto planeMesh = CreatePlaneMesh();
     auto cylinderMesh = CreateCylinderMesh();
     auto skyMesh = CreateSkyMesh();
+    auto fullscreenTriangleMesh = CreateFullscreenTriangleMesh();
     Remove(cubeMesh->mID);
     Remove(sphereMesh->mID);
     Remove(planeMesh->mID);
     Remove(cylinderMesh->mID);
     Remove(skyMesh->mID);
+    Remove(fullscreenTriangleMesh->mID);
     cubeMesh->mID = mDefaultMeshes[DefaultMeshType::Cube];
     sphereMesh->mID = mDefaultMeshes[DefaultMeshType::Sphere];
     planeMesh->mID = mDefaultMeshes[DefaultMeshType::Plane];
     cylinderMesh->mID = mDefaultMeshes[DefaultMeshType::Cylinder];
     skyMesh->mID = mDefaultMeshes[DefaultMeshType::Sky];
+    fullscreenTriangleMesh->mID = mDefaultMeshes[DefaultMeshType::FullscreenTriangle];
 
     mAssets[mDefaultMeshes[DefaultMeshType::Cube]] = cubeMesh;
     mAssets[mDefaultMeshes[DefaultMeshType::Sphere]] = sphereMesh;
     mAssets[mDefaultMeshes[DefaultMeshType::Plane]] = planeMesh;
     mAssets[mDefaultMeshes[DefaultMeshType::Cylinder]] = cylinderMesh;
     mAssets[mDefaultMeshes[DefaultMeshType::Sky]] = skyMesh;
+    mAssets[mDefaultMeshes[DefaultMeshType::FullscreenTriangle]] = fullscreenTriangleMesh;
 }
 std::shared_ptr<MMesh> MMeshManager::CreateCubeMesh()
 {
@@ -474,6 +478,23 @@ std::shared_ptr<MMesh> MMeshManager::CreateSkyMesh()
 
     auto meshSetting = MMeshSetting{};
     auto mesh = Create("Sky Mesh", vertices, indices, meshSetting);
+    CreateVulkanResources(mesh);
+    Write(mesh);
+    return mesh;
+}
+std::shared_ptr<MMesh> MMeshManager::CreateFullscreenTriangleMesh()
+{
+    const std::vector<Vertex> vertices = {
+        // 全屏三角形顶点
+        {{-1.0f, -1.0f, 0.0f}, {}, {0.0f, 0.0f}}, // 左下角
+        {{3.0f, -1.0f, 0.0f}, {}, {2.0f, 0.0f}},  // 右下角
+        {{-1.0f, 3.0f, 0.0f}, {}, {0.0f, 2.0f}}   // 左上角
+    };
+
+    const std::vector<uint32_t> indices = {0, 1, 2}; // 三角形索引
+
+    auto meshSetting = MMeshSetting{};
+    auto mesh = Create("Fullscreen Triangle Mesh", vertices, indices, meshSetting);
     CreateVulkanResources(mesh);
     Write(mesh);
     return mesh;

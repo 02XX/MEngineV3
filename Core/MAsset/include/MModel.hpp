@@ -46,7 +46,6 @@ class MModel : public MAsset
     {
         mType = MAssetType::Model;
         mState = MAssetState::Unloaded;
-        
     }
     inline const Node *GetRootNode() const
     {
@@ -59,6 +58,15 @@ class MModel : public MAsset
     inline const std::vector<std::shared_ptr<MMaterial>> &GetMaterials() const
     {
         return mMaterials;
+    }
+    inline void SetMaterials(const std::vector<std::shared_ptr<MMaterial>> &materials)
+    {
+        mMaterials = materials;
+        mMaterialIDs.clear();
+        for (const auto &material : mMaterials)
+        {
+            mMaterialIDs.push_back(material->GetID());
+        }
     }
 };
 } // namespace MEngine::Core::Asset

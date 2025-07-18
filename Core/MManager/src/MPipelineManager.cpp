@@ -131,14 +131,10 @@ void MPipelineManager::CreateVulkanResources(std::shared_ptr<MPipeline> pipeline
         .setMaxDepthBounds(pipeline->mSetting.MaxDepthBounds)
         .setStencilTestEnable(pipeline->mSetting.StencilTestEnable);
     // ========== 8. 颜色混合状态 ==========
-    vk::PipelineColorBlendAttachmentState colorBlendAttachment{};
-    colorBlendAttachment.setBlendEnable(pipeline->mSetting.ColorBlendingEnable)
-        .setColorWriteMask(vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
-                           vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA);
     vk::PipelineColorBlendStateCreateInfo colorBlendInfo{};
     colorBlendInfo.setLogicOpEnable(pipeline->mSetting.LogicOpEnable)
         .setLogicOp(pipeline->mSetting.LogicOp)
-        .setAttachments(colorBlendAttachment)
+        .setAttachments(pipeline->mSetting.colorBlendAttachments)
         .setBlendConstants({0.0f, 0.0f, 0.0f, 0.0f});
     // ========== 9. 动态状态 ==========
     std::vector<vk::DynamicState> dynamicStates = {vk::DynamicState::eViewport, vk::DynamicState::eScissor};
@@ -242,8 +238,9 @@ void MPipelineManager::Remove(const UUID &id)
 }
 void MPipelineManager::CreateDefault()
 {
+
     // ForwardOpaquePBR
-    std::vector<vk::DescriptorSetLayoutBinding> mDescriptorSetLayoutBindings{
+    std::vector<vk::DescriptorSetLayoutBinding> PBRDescriptorSetLayoutBindings{
 
         vk::DescriptorSetLayoutBinding{0, vk::DescriptorType::eUniformBuffer, 1,
                                        vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
@@ -263,11 +260,11 @@ void MPipelineManager::CreateDefault()
     pbrSetting.VertexShaderPath = "Engine/Shaders/ForwardOpaquePBR.vert";
     pbrSetting.FragmentShaderPath = "Engine/Shaders/ForwardOpaquePBR.frag";
     pbrSetting.RenderPassType = RenderPassType::ForwardComposition;
-    pbrSetting.MaterialDescriptorSetLayoutBindings = mDescriptorSetLayoutBindings;
+    pbrSetting.MaterialDescriptorSetLayoutBindings = PBRDescriptorSetLayoutBindings;
     auto pbrPipeline = Create(PipelineType::ForwardOpaquePBR, pbrSetting);
     CreateVulkanResources(pbrPipeline);
     // Sky
-    mDescriptorSetLayoutBindings = {
+    PBRDescriptorSetLayoutBindings = {
         // Binding: 0 Environment Map
         vk::DescriptorSetLayoutBinding{0, vk::DescriptorType::eCombinedImageSampler, 1,
                                        vk::ShaderStageFlagBits::eFragment},
@@ -280,9 +277,71 @@ void MPipelineManager::CreateDefault()
     skySetting.FragmentShaderPath = "Engine/Shaders/Sky.frag";
     skySetting.RenderPassType = RenderPassType::Sky;
     skySetting.DepthWriteEnable = false;
-    skySetting.MaterialDescriptorSetLayoutBindings = mDescriptorSetLayoutBindings;
+    skySetting.MaterialDescriptorSetLayoutBindings = PBRDescriptorSetLayoutBindings;
     auto skyPipeline = Create(PipelineType::Sky, skySetting);
     CreateVulkanResources(skyPipeline);
+    // GBuffer
+    std::vector<vk::PipelineColorBlendAttachmentState> colorBlendAttachments{
+        // color attachment
+        vk::PipelineColorBlendAttachmentState().setBlendEnable(false).setColorWriteMask(
+            vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eB |
+            vk::ColorComponentFlagBits::eA),
+        // normal attachment
+        vk::PipelineColorBlendAttachmentState().setBlendEnable(false).setColorWriteMask(
+            vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eB |
+            vk::ColorComponentFlagBits::eA),
+        // arm attachment
+        vk::PipelineColorBlendAttachmentState().setBlendEnable(false).setColorWriteMask(
+            vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eB |
+            vk::ColorComponentFlagBits::eA),
+        // position attachment
+        vk::PipelineColorBlendAttachmentState().setBlendEnable(false).setColorWriteMask(
+            vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eB |
+            vk::ColorComponentFlagBits::eA),
+    };
+    std::vector<vk::DescriptorSetLayoutBinding> GBufferDescriptorSetLayoutBindings{
+
+        vk::DescriptorSetLayoutBinding{0, vk::DescriptorType::eUniformBuffer, 1,
+                                       vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
+        // Binding: 1 Albedo
+        vk::DescriptorSetLayoutBinding{1, vk::DescriptorType::eCombinedImageSampler, 1,
+                                       vk::ShaderStageFlagBits::eFragment},
+        // Binding: 2 Normal Map
+        vk::DescriptorSetLayoutBinding{2, vk::DescriptorType::eCombinedImageSampler, 1,
+                                       vk::ShaderStageFlagBits::eFragment},
+        // Binding: 3 ARM (Ambient Occlusion, Roughness, Metallic)
+        vk::DescriptorSetLayoutBinding{3, vk::DescriptorType::eCombinedImageSampler, 1,
+                                       vk::ShaderStageFlagBits::eFragment},
+        // Binding: 4 Position Map
+        vk::DescriptorSetLayoutBinding{4, vk::DescriptorType::eCombinedImageSampler, 1,
+                                       vk::ShaderStageFlagBits::eFragment}};
+    auto gBufferSetting = MPipelineSetting{};
+    gBufferSetting.VertexShaderPath = "Engine/Shaders/GBuffer.vert";
+    gBufferSetting.FragmentShaderPath = "Engine/Shaders/GBuffer.frag";
+    gBufferSetting.RenderPassType = RenderPassType::GBuffer;
+    gBufferSetting.MaterialDescriptorSetLayoutBindings = GBufferDescriptorSetLayoutBindings;
+    gBufferSetting.colorBlendAttachments = colorBlendAttachments;
+    auto gBufferPipeline = Create(PipelineType::GBuffer, gBufferSetting);
+    CreateVulkanResources(gBufferPipeline);
+    // Lighting
+    std::vector<vk::DescriptorSetLayoutBinding> LightingDescriptorSetLayoutBindings{
+        vk::DescriptorSetLayoutBinding{0, vk::DescriptorType::eUniformBuffer, 1,
+                                       vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
+        // Binding: 1 Albedo
+        vk::DescriptorSetLayoutBinding{1, vk::DescriptorType::eInputAttachment, 1, vk::ShaderStageFlagBits::eFragment},
+        // Binding: 2 Normal Map
+        vk::DescriptorSetLayoutBinding{2, vk::DescriptorType::eInputAttachment, 1, vk::ShaderStageFlagBits::eFragment},
+        // Binding: 3 ARM (Ambient Occlusion, Roughness, Metallic)
+        vk::DescriptorSetLayoutBinding{3, vk::DescriptorType::eInputAttachment, 1, vk::ShaderStageFlagBits::eFragment},
+        // Binding: 4 Position Map
+        vk::DescriptorSetLayoutBinding{4, vk::DescriptorType::eInputAttachment, 1, vk::ShaderStageFlagBits::eFragment}};
+    auto lightingSetting = MPipelineSetting{};
+    lightingSetting.VertexShaderPath = "Engine/Shaders/Lighting.vert";
+    lightingSetting.FragmentShaderPath = "Engine/Shaders/Lighting.frag";
+    lightingSetting.RenderPassType = RenderPassType::Lighting;
+    lightingSetting.MaterialDescriptorSetLayoutBindings = LightingDescriptorSetLayoutBindings;
+    auto lightingPipeline = Create(PipelineType::Lighting, lightingSetting);
+    CreateVulkanResources(lightingPipeline);
 }
 
 } // namespace MEngine::Core::Manager

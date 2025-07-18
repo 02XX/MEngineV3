@@ -32,10 +32,10 @@ class IMTextureManager : public virtual IMManager<MTexture>
     virtual std::shared_ptr<MTexture> CreateWhiteTexture() = 0;
     virtual std::shared_ptr<MTexture> CreateBlackTexture() = 0;
     virtual std::shared_ptr<MTexture> CreateMagentaTexture() = 0;
-    virtual std::shared_ptr<MTexture> CreateNormalTexture() = 0;
-    virtual std::shared_ptr<MTexture> CreateEmissiveTexture() = 0;
-    virtual std::shared_ptr<MTexture> CreateAlbedoTexture() = 0;
-    virtual std::shared_ptr<MTexture> CreateARMTexture() = 0;
+    virtual std::shared_ptr<MTexture> CreateNormalTexture(uint32_t width, uint32_t height) = 0;
+    virtual std::shared_ptr<MTexture> CreateEmissiveTexture(uint32_t width, uint32_t height) = 0;
+    virtual std::shared_ptr<MTexture> CreateAlbedoTexture(uint32_t width, uint32_t height) = 0;
+    virtual std::shared_ptr<MTexture> CreateARMTexture(uint32_t width, uint32_t height) = 0;
     virtual std::shared_ptr<MTexture> CreateEnvironmentMap() = 0;
     virtual std::shared_ptr<MTexture> CreateIrradianceMap() = 0;
     virtual std::shared_ptr<MTexture> CreateBRDFLUT() = 0;

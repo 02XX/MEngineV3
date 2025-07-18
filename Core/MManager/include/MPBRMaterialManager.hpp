@@ -18,6 +18,7 @@ class MPBRMaterialManager final : public MMaterialManager<MPBRMaterial>, public 
     std::shared_ptr<MPBRMaterial> Create(const std::string &name, const std::string &pipelineName,
                                          const MPBRMaterialProperties &properties, const MPBRTextures &textures,
                                          const MPBRMaterialSetting &setting) override;
+    std::shared_ptr<MPBRMaterial> CreateLightMaterial() override;
     void Update(std::shared_ptr<MPBRMaterial> material) override;
     void Write(std::shared_ptr<MPBRMaterial> material) override;
     void CreateDefault() override;

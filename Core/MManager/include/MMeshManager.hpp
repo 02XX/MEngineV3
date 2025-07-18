@@ -25,6 +25,8 @@ class MMeshManager final : public MManager<MMesh>, public IMMeshManager
         {DefaultMeshType::Plane, UUID{"00000000-0000-0000-0000-000000000003"}},
         {DefaultMeshType::Sphere, UUID{"00000000-0000-0000-0000-000000000004"}},
         {DefaultMeshType::Sky, UUID{"00000000-0000-0000-0000-000000000005"}},
+        {DefaultMeshType::FullscreenTriangle, UUID{"00000000-0000-0000-0000-000000000006"}},
+
     };
 
   public:
@@ -41,6 +43,8 @@ class MMeshManager final : public MManager<MMesh>, public IMMeshManager
     std::shared_ptr<MMesh> CreatePlaneMesh() override;
     std::shared_ptr<MMesh> CreateCylinderMesh() override;
     std::shared_ptr<MMesh> CreateSkyMesh() override;
+    std::shared_ptr<MMesh> CreateFullscreenTriangleMesh() override;
     std::shared_ptr<MMesh> GetMesh(DefaultMeshType type) const override;
 };
+
 } // namespace MEngine::Core::Manager
