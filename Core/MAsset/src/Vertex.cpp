@@ -1,10 +1,10 @@
 #include "Vertex.hpp"
 
-namespace MEngine::Core::Asset
+namespace MEngine::Core
 {
-std::array<vk::VertexInputAttributeDescription, 3> Vertex::GetVertexInputAttributeDescription()
+std::vector<vk::VertexInputAttributeDescription> Vertex::GetVertexInputAttributeDescription()
 {
-    std::array<vk::VertexInputAttributeDescription, 3> attributeDescriptions;
+    std::vector<vk::VertexInputAttributeDescription> attributeDescriptions(3);
     attributeDescriptions[0].setBinding(0).setLocation(0).setFormat(vk::Format::eR32G32B32Sfloat).setOffset(0);
     attributeDescriptions[1]
         .setBinding(0)
@@ -24,4 +24,4 @@ vk::VertexInputBindingDescription Vertex::GetVertexInputBindingDescription()
     bindingDescription.setBinding(0).setStride(sizeof(Vertex)).setInputRate(vk::VertexInputRate::eVertex);
     return bindingDescription;
 }
-} // namespace MEngine::Core::Asset
+} // namespace MEngine::Core

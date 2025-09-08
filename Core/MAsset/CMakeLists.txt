@@ -15,7 +15,7 @@ target_link_libraries(MAsset PUBLIC glm::glm)
 target_link_libraries(MAsset PUBLIC nlohmann_json::nlohmann_json)
 target_link_libraries(MAsset PUBLIC Common)
 target_link_libraries(MAsset PUBLIC assimp::assimp)
-target_link_libraries(MAsset PUBLIC UUID MThread Platform MManager Math)
+target_link_libraries(MAsset PUBLIC UUID MThread Platform MManager Math Enums)
 
 
 

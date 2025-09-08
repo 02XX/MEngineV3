@@ -2,7 +2,7 @@
 #include "Logger.hpp"
 #include <vector>
 #include <vulkan/vulkan.hpp>
-namespace MEngine::Core::Manager
+namespace MEngine::Core
 {
 
 void RenderPassManager::CreateCompositionRenderPass()
@@ -28,7 +28,7 @@ void RenderPassManager::CreateCompositionRenderPass()
             .setStencilStoreOp(vk::AttachmentStoreOp::eDontCare)
             .setInitialLayout(vk::ImageLayout::eUndefined)
             .setFinalLayout(vk::ImageLayout::eDepthStencilAttachmentOptimal),
-        // 2: Normal Map
+        // 2: Albedo Map
         vk::AttachmentDescription()
             .setFormat(vk::Format::eR32G32B32A32Sfloat)
             .setSamples(vk::SampleCountFlagBits::e1)
@@ -38,7 +38,7 @@ void RenderPassManager::CreateCompositionRenderPass()
             .setStencilStoreOp(vk::AttachmentStoreOp::eDontCare)
             .setInitialLayout(vk::ImageLayout::eUndefined)
             .setFinalLayout(vk::ImageLayout::eShaderReadOnlyOptimal),
-        // 3: ARM Map
+        // 3: Normal Map
         vk::AttachmentDescription()
             .setFormat(vk::Format::eR32G32B32A32Sfloat)
             .setSamples(vk::SampleCountFlagBits::e1)
@@ -48,7 +48,27 @@ void RenderPassManager::CreateCompositionRenderPass()
             .setStencilStoreOp(vk::AttachmentStoreOp::eDontCare)
             .setInitialLayout(vk::ImageLayout::eUndefined)
             .setFinalLayout(vk::ImageLayout::eShaderReadOnlyOptimal),
-        // 4. Position Map
+        // 4: ARM Map
+        vk::AttachmentDescription()
+            .setFormat(vk::Format::eR32G32B32A32Sfloat)
+            .setSamples(vk::SampleCountFlagBits::e1)
+            .setLoadOp(vk::AttachmentLoadOp::eClear)
+            .setStoreOp(vk::AttachmentStoreOp::eStore)
+            .setStencilLoadOp(vk::AttachmentLoadOp::eDontCare)
+            .setStencilStoreOp(vk::AttachmentStoreOp::eDontCare)
+            .setInitialLayout(vk::ImageLayout::eUndefined)
+            .setFinalLayout(vk::ImageLayout::eShaderReadOnlyOptimal),
+        // 5. Position Map
+        vk::AttachmentDescription()
+            .setFormat(vk::Format::eR32G32B32A32Sfloat)
+            .setSamples(vk::SampleCountFlagBits::e1)
+            .setLoadOp(vk::AttachmentLoadOp::eClear)
+            .setStoreOp(vk::AttachmentStoreOp::eStore)
+            .setStencilLoadOp(vk::AttachmentLoadOp::eDontCare)
+            .setStencilStoreOp(vk::AttachmentStoreOp::eDontCare)
+            .setInitialLayout(vk::ImageLayout::eUndefined)
+            .setFinalLayout(vk::ImageLayout::eShaderReadOnlyOptimal),
+        // 6. Emissive Map
         vk::AttachmentDescription()
             .setFormat(vk::Format::eR32G32B32A32Sfloat)
             .setSamples(vk::SampleCountFlagBits::e1)
@@ -61,13 +81,14 @@ void RenderPassManager::CreateCompositionRenderPass()
     };
     // SubPass 0: GBuffer
     std::vector<vk::AttachmentReference> gBufferColorRefs{
-        vk::AttachmentReference(0, vk::ImageLayout::eColorAttachmentOptimal), // Render Target: Color
-        vk::AttachmentReference(2, vk::ImageLayout::eColorAttachmentOptimal), // Normal Map
-        vk::AttachmentReference(3, vk::ImageLayout::eColorAttachmentOptimal), // ARM Map
-        vk::AttachmentReference(4, vk::ImageLayout::eColorAttachmentOptimal), // Position Map
+        vk::AttachmentReference(2, vk::ImageLayout::eColorAttachmentOptimal), // Albedo Map
+        vk::AttachmentReference(3, vk::ImageLayout::eColorAttachmentOptimal), // Normal Map
+        vk::AttachmentReference(4, vk::ImageLayout::eColorAttachmentOptimal), // ARM Map
+        vk::AttachmentReference(5, vk::ImageLayout::eColorAttachmentOptimal), // Position Map
+        vk::AttachmentReference(6, vk::ImageLayout::eColorAttachmentOptimal), // Emissive Map
     };
     vk::AttachmentReference gBufferDepthRef{
-        vk::AttachmentReference(1, vk::ImageLayout::eDepthStencilAttachmentOptimal), // Render Target: Depth
+        vk::AttachmentReference(1, vk::ImageLayout::eDepthStencilAttachmentOptimal), // Depth
     };
     vk::SubpassDescription gBufferSubpass{};
     gBufferSubpass.setPipelineBindPoint(vk::PipelineBindPoint::eGraphics)
@@ -76,12 +97,14 @@ void RenderPassManager::CreateCompositionRenderPass()
     mSubPasses[RenderPassType::GBuffer] = 0; // SubPass 0
     // SubPass 1: Lighting
     std::vector<vk::AttachmentReference> lightingColorRefs{
-        vk::AttachmentReference(0, vk::ImageLayout::eColorAttachmentOptimal), // Render Target: Color
+        vk::AttachmentReference(0, vk::ImageLayout::eColorAttachmentOptimal), // Color
     };
     std::vector<vk::AttachmentReference> lightingInputRefs{
-        vk::AttachmentReference(2, vk::ImageLayout::eShaderReadOnlyOptimal), // Normal Map
-        vk::AttachmentReference(3, vk::ImageLayout::eShaderReadOnlyOptimal), // ARM Map
-        vk::AttachmentReference(4, vk::ImageLayout::eShaderReadOnlyOptimal), // Position Map
+        vk::AttachmentReference(2, vk::ImageLayout::eShaderReadOnlyOptimal), // Albedo Map
+        vk::AttachmentReference(3, vk::ImageLayout::eShaderReadOnlyOptimal), // Normal Map
+        vk::AttachmentReference(4, vk::ImageLayout::eShaderReadOnlyOptimal), // ARM Map
+        vk::AttachmentReference(5, vk::ImageLayout::eShaderReadOnlyOptimal), // Position Map
+        vk::AttachmentReference(6, vk::ImageLayout::eShaderReadOnlyOptimal), // Emissive Map
     };
     vk::SubpassDescription lightingSubpass{};
     lightingSubpass.setPipelineBindPoint(vk::PipelineBindPoint::eGraphics)
@@ -96,11 +119,11 @@ void RenderPassManager::CreateCompositionRenderPass()
     vk::AttachmentReference depthRef{
         vk::AttachmentReference(1, vk::ImageLayout::eDepthStencilAttachmentOptimal), // Render Target: Depth
     };
-    vk::SubpassDescription forwardCompositionSubpass{};
-    forwardCompositionSubpass.setPipelineBindPoint(vk::PipelineBindPoint::eGraphics)
+    vk::SubpassDescription forwardOpaqueSubpass{};
+    forwardOpaqueSubpass.setPipelineBindPoint(vk::PipelineBindPoint::eGraphics)
         .setColorAttachments(colorRefs)
         .setPDepthStencilAttachment(&depthRef);
-    mSubPasses[RenderPassType::ForwardComposition] = 2; // SubPass 2
+    mSubPasses[RenderPassType::ForwardOpaque] = 2; // SubPass 2
     // SubPass 3: Sky RenderPass
     std::vector<vk::AttachmentReference> environmentColorRefs{
         vk::AttachmentReference(0, vk::ImageLayout::eColorAttachmentOptimal), // Render Target: Color
@@ -114,7 +137,7 @@ void RenderPassManager::CreateCompositionRenderPass()
     std::vector<vk::SubpassDescription> subpasses{
         gBufferSubpass,
         lightingSubpass,
-        forwardCompositionSubpass,
+        forwardOpaqueSubpass,
         environmentSubpass,
     };
     // subpass dependencies
@@ -164,4 +187,4 @@ std::tuple<vk::RenderPass, uint32_t> RenderPassManager::GetRenderPass(RenderPass
     throw std::runtime_error("SubPass pass type not found");
 }
 
-} // namespace MEngine::Core::Manager
+} // namespace MEngine::Core

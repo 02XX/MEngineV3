@@ -1,14 +1,18 @@
 #pragma once
-#include "MPipeline.hpp"
 #include "VulkanContext.hpp"
 #include <cstdint>
 #include <memory>
 #include <tuple>
 #include <unordered_map>
-#include <vulkan/vulkan_handles.hpp>
-using namespace MEngine::Core::Asset;
-namespace MEngine::Core::Manager
+namespace MEngine::Core
 {
+enum class RenderPassType
+{
+    GBuffer,
+    Lighting,
+    Sky,
+    ForwardOpaque,
+};
 class RenderPassManager final
 {
   private:
@@ -42,4 +46,4 @@ class RenderPassManager final
     }
 };
 
-} // namespace MEngine::Core::Manager
+} // namespace MEngine::Core

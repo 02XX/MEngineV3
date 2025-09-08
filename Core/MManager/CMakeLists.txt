@@ -6,6 +6,6 @@ set_source_files_properties(${SOURCE_FILES} PROPERTIES CMAKE_CONFIGURE_DEPENDS O
 add_library(MManager ${RESOURCE})
 target_include_directories(MManager PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
-target_link_libraries(MManager PUBLIC MAsset Utils)
+target_link_libraries(MManager PUBLIC MAsset Utils Enums)
 
 
