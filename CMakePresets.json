@@ -2,21 +2,7 @@
     "version": 2,
     "configurePresets": [
         {
-            "name": "vcpkg-msvc",
-            "generator": "Ninja",
-            "binaryDir": "${sourceDir}/build-msvc",
-            "cacheVariables": {
-                "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
-                "CMAKE_C_COMPILER": "cl",
-                "CMAKE_CXX_COMPILER": "cl",
-                "VCPKG_TARGET_TRIPLET": "x64-windows",
-                "VCPKG_HOST_TRIPLET": "x64-windows",
-                "VCPKG_MANIFEST_MODE": "ON",
-                "CMAKE_BUILD_TYPE": "Debug"
-            }
-        },
-        {
-            "name": "vcpkg-clang",
+            "name": "Debug_x64-windows_clang",
             "generator": "Ninja",
             "binaryDir": "${sourceDir}/build",
             "cacheVariables": {
@@ -33,26 +19,53 @@
             }
         },
         {
-            "name": "vcpkg-clang-clion",
+            "name": "Release_x64-windows_clang",
             "generator": "Ninja",
             "binaryDir": "${sourceDir}/build-clion",
             "cacheVariables": {
                 "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
-                "CMAKE_C_COMPILER": "clang",
-                "CMAKE_CXX_COMPILER": "clang++",
+                "CMAKE_C_COMPILER": "ccache",
+                "CMAKE_C_COMPILER_ARG1": "clang",
+                "CMAKE_CXX_COMPILER": "ccache",
+                "CMAKE_CXX_COMPILER_ARG1": "clang++",
                 "VCPKG_TARGET_TRIPLET": "x64-windows",
                 "VCPKG_HOST_TRIPLET": "x64-windows",
                 "VCPKG_MANIFEST_MODE": "ON",
-                "CMAKE_BUILD_TYPE": "Debug"
+                "CMAKE_BUILD_TYPE": "Release"
             }
-        }
-    ],
-    "testPresets": [
+        },
         {
-            "name": "Test",
-            "description": "",
-            "displayName": "",
-            "configurePreset": "vcpkg-clang"
+            "name": "Debug_x64-mingw_clang",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build",
+            "cacheVariables": {
+                "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+                "CMAKE_C_COMPILER": "ccache",
+                "CMAKE_C_COMPILER_ARG1": "clang",
+                "CMAKE_CXX_COMPILER": "ccache",
+                "CMAKE_CXX_COMPILER_ARG1": "clang++",
+                "VCPKG_TARGET_TRIPLET": "x64-mingw-static",
+                "VCPKG_HOST_TRIPLET": "x64-mingw-static",
+                "VCPKG_MANIFEST_MODE": "ON",
+                "CMAKE_BUILD_TYPE": "Debug",
+                "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+            }
+        },
+        {
+            "name": "Release_x64-mingw_clang",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build-clion",
+            "cacheVariables": {
+                "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+                "CMAKE_C_COMPILER": "ccache",
+                "CMAKE_C_COMPILER_ARG1": "clang",
+                "CMAKE_CXX_COMPILER": "ccache",
+                "CMAKE_CXX_COMPILER_ARG1": "clang++",
+                "VCPKG_TARGET_TRIPLET": "x64-mingw-static",
+                "VCPKG_HOST_TRIPLET": "x64-mingw-static",
+                "VCPKG_MANIFEST_MODE": "ON",
+                "CMAKE_BUILD_TYPE": "Release"
+            }
         }
     ]
 }

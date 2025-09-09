@@ -1,14 +1,12 @@
 #pragma once
 
 #include <filesystem>
-#include <ktx.h>
 #include <stb_image.h>
 #include <stb_image_write.h>
 #include <tuple>
 #include <vector>
 #include <vulkan/vulkan.hpp>
 
-#include <ktxvulkan.h>
 
 namespace MEngine::Core::Utils
 {
