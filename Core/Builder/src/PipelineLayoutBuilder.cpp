@@ -3,16 +3,25 @@ namespace MEngine::Core
 {
 void PipelineLayoutBuilder::Reset()
 {
-    mPipelineLayoutCreateInfo = vk::PipelineLayoutCreateInfo();
-    mSetLayouts.clear();
-    mPushConstantRanges.clear();
-    mPipelineLayoutBindings.clear();
-    mPipelineLayoutDescriptorSetLayout.reset();
+    mPipelineLayout = std::unique_ptr<PipelineLayout>(new PipelineLayout());
+}
+std::unique_ptr<PipelineLayout> PipelineLayoutBuilder::Build()
+{
+    mPipelineLayout->mPipelineLayoutCreateInfo.setSetLayouts(mPipelineLayout->mSetLayouts)
+        .setPushConstantRanges(mPipelineLayout->mPushConstantRanges);
+    vk::UniquePipelineLayout pipelineLayout =
+        mVulkanContext->GetDevice().createPipelineLayoutUnique(mPipelineLayout->mPipelineLayoutCreateInfo);
+    if (!pipelineLayout)
+    {
+        throw std::runtime_error("Failed to create PBR Pipeline Layout");
+    }
+    mPipelineLayout->mPipelineLayout = std::move(pipelineLayout);
+    return std::move(mPipelineLayout);
 }
 void PipelineLayoutBuilder::SetBindings()
 {
     // set:0
-    mPipelineLayoutBindings = std::vector<vk::DescriptorSetLayoutBinding>{
+    mPipelineLayout->mPipelineLayoutBindings.push_back({
         // set:0
         // Binding: 0 VP (View Projection Matrix)
         vk::DescriptorSetLayoutBinding{0, vk::DescriptorType::eUniformBuffer, 1,
@@ -29,19 +38,20 @@ void PipelineLayoutBuilder::SetBindings()
         // Binding: 4 BRDF LUT
         vk::DescriptorSetLayoutBinding{4, vk::DescriptorType::eCombinedImageSampler, 1,
                                        vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
-    };
+    });
 }
 void PipelineLayoutBuilder::SetLayout()
 {
     vk::DescriptorSetLayoutCreateInfo layoutInfo{};
-    layoutInfo.setBindings(mPipelineLayoutBindings);
-    mPipelineLayoutDescriptorSetLayout = mVulkanContext->GetDevice().createDescriptorSetLayoutUnique(layoutInfo);
+    layoutInfo.setBindings(mPipelineLayout->mPipelineLayoutBindings.back());
+    mPipelineLayout->mPipelineLayoutDescriptorSetLayouts.push_back(
+        mVulkanContext->GetDevice().createDescriptorSetLayoutUnique(layoutInfo));
 }
 void PipelineLayoutBuilder::SetPushConstants()
 {
-    vk::PushConstantRange mPushConstantRange{};
-    mPushConstantRange.setSize(64).setOffset(0).setStageFlags(vk::ShaderStageFlagBits::eVertex |
-                                                              vk::ShaderStageFlagBits::eFragment);
-    mPushConstantRanges.push_back(mPushConstantRange);
+    vk::PushConstantRange pushConstantRange{};
+    pushConstantRange.setSize(64).setOffset(0).setStageFlags(vk::ShaderStageFlagBits::eVertex |
+                                                             vk::ShaderStageFlagBits::eFragment);
+    mPipelineLayout->mPushConstantRanges.push_back(pushConstantRange);
 }
 } // namespace MEngine::Core

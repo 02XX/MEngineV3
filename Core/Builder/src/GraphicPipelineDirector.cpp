@@ -6,6 +6,7 @@ namespace MEngine::Core
 {
 std::unique_ptr<GraphicPipeline> GraphicPipelineDirector::Make(IGraphicPipelineBuilder &builder)
 {
+    builder.SetName();
     builder.SetVertexInputState();
     builder.SetInputAssemblyState();
     builder.SetShader();

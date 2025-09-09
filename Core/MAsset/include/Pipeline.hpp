@@ -11,21 +11,16 @@ namespace MEngine::Core
 {
 class Pipeline : public Asset
 {
-  private:
+  protected:
     vk::UniquePipeline mPipeline{nullptr};
     PipelineLayoutType mPipelineLayoutType{PipelineLayoutType::None};
 
   protected:
-    Pipeline() : Asset(UUID{}, "Unnamed")
+    Pipeline() : Asset()
     {
     }
 
   public:
-    Pipeline(const UUID &id, const std::string &name, vk::UniquePipeline pipeline,
-             PipelineLayoutType pipelineLayoutType)
-        : Asset(id, name), mPipeline(std::move(pipeline)), mPipelineLayoutType(pipelineLayoutType)
-    {
-    }
     ~Pipeline() override = default;
     inline vk::Pipeline GetPipeline() const
     {

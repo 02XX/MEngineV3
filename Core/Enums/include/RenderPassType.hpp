@@ -8,4 +8,5 @@ enum class RenderPassType
     Sky,
     ForwardOpaque,
 };
+
 } // namespace MEngine::Core

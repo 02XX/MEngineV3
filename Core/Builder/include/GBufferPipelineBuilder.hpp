@@ -14,11 +14,10 @@ class GBufferPipelineBuilder : public GraphicPipelineBuilder, public virtual IGr
     {
     }
     ~GBufferPipelineBuilder() override = default;
-    virtual void Reset() override;
-    virtual std::unique_ptr<GraphicPipeline> Build() override;
-    virtual void SetName(const std::string &name) override;
+    virtual void SetName() override;
     virtual void SetShader() override;
     virtual void SetColorBlendState() override;
     virtual void SetLayout() override;
-    virtual void SetRenderPass() override;};
+    virtual void SetRenderPass() override;
+};
 } // namespace MEngine::Core

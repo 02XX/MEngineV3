@@ -1,12 +1,31 @@
 #pragma once
 #include "Pipeline.hpp"
+#include "RenderPassType.hpp"
 namespace MEngine::Core
 {
 class GraphicPipeline final : public Pipeline
 {
-  private:
-    // TODO: renderpass持久化资源化可配置
-    uint32_t mSubPass{0};
+    friend class GraphicPipelineBuilder;
+    friend class GBufferPipelineBuilder;
+    friend class CustomGraphicPipelineBuilder;
+
+  protected:
+    vk::GraphicsPipelineCreateInfo mCreateInfo{};
+    vk::VertexInputBindingDescription mVertexBindings{};
+    std::vector<vk::VertexInputAttributeDescription> mVertexAttributes{};
+    vk::PipelineVertexInputStateCreateInfo mVertexInputInfo{};
+    vk::PipelineInputAssemblyStateCreateInfo mInputAssemblyState{};
+    vk::PipelineRasterizationStateCreateInfo mRasterizationState{};
+    vk::PipelineViewportStateCreateInfo mViewportState{};
+    vk::PipelineMultisampleStateCreateInfo mMultisampleState{};
+    vk::PipelineDepthStencilStateCreateInfo mDepthStencilState{};
+    vk::PipelineColorBlendStateCreateInfo mColorBlendState{};
+    std::vector<vk::PipelineColorBlendAttachmentState> mColorBlendAttachments{};
+    vk::PipelineDynamicStateCreateInfo mDynamicState{};
+    std::vector<vk::DynamicState> mDynamicStates{};
+
+    std::vector<vk::PipelineShaderStageCreateInfo> mShaderStages{};
+    RenderPassType mRenderPassType{RenderPassType::ForwardOpaque};
 
   protected:
     GraphicPipeline() : Pipeline()
@@ -15,12 +34,6 @@ class GraphicPipeline final : public Pipeline
     }
 
   public:
-    GraphicPipeline(const UUID &id, const std::string &name, vk::UniquePipeline pipeline,
-                    PipelineLayoutType pipelineLayoutType, uint32_t subPass)
-        : Pipeline(id, name, std::move(pipeline), pipelineLayoutType), mSubPass(subPass)
-    {
-        mType = AssetType::Shader;
-    }
     ~GraphicPipeline() override = default;
 };
 } // namespace MEngine::Core

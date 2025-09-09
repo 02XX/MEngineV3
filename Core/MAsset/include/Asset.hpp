@@ -1,5 +1,6 @@
 #pragma once
 #include "UUID.hpp"
+#include "UUIDGenerator.hpp"
 #include <string>
 
 namespace MEngine::Core
@@ -37,11 +38,11 @@ class Asset
     std::string mName{"Unnamed"};
     AssetState mState = AssetState::Unloaded;
     AssetType mType = AssetType::Unknown;
-
-  public:
-    Asset(const UUID &id, std::string_view name) : mID(std::move(id)), mName(name)
+    Asset() : mID(UUIDGenerator::Instance().Create()), mName("Unnamed")
     {
     }
+
+  public:
     virtual ~Asset() = default;
     virtual inline const UUID &GetID() const
     {

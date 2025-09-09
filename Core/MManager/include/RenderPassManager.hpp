@@ -1,4 +1,5 @@
 #pragma once
+#include "RenderPassType.hpp"
 #include "VulkanContext.hpp"
 #include <cstdint>
 #include <memory>
@@ -6,13 +7,7 @@
 #include <unordered_map>
 namespace MEngine::Core
 {
-enum class RenderPassType
-{
-    GBuffer,
-    Lighting,
-    Sky,
-    ForwardOpaque,
-};
+
 class RenderPassManager final
 {
   private:

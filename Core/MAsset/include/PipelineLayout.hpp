@@ -8,22 +8,28 @@ namespace MEngine::Core
 {
 class PipelineLayout : public Asset
 {
+    friend class PipelineLayoutBuilder;
+    friend class PBRPipelineLayoutBuilder;
+
   private:
     vk::UniquePipelineLayout mPipelineLayout{nullptr};
     vk::UniqueDescriptorSetLayout mDescriptorSetLayout{nullptr};
-    PipelineLayoutType mPipelineLayoutType{PipelineLayoutType::None};
 
   protected:
-    PipelineLayout() : Asset(UUID{}, "Unnamed")
+    PipelineLayoutType mPipelineLayoutType{PipelineLayoutType::None};
+    vk::PipelineLayoutCreateInfo mPipelineLayoutCreateInfo{};
+    std::vector<vk::DescriptorSetLayout> mSetLayouts{};
+    std::vector<vk::PushConstantRange> mPushConstantRanges{};
+
+    std::vector<std::vector<vk::DescriptorSetLayoutBinding>> mPipelineLayoutBindings{};
+    std::vector<vk::UniqueDescriptorSetLayout> mPipelineLayoutDescriptorSetLayouts{};
+
+  protected:
+    PipelineLayout() : Asset()
     {
     }
 
   public:
-    PipelineLayout(const UUID &id, const std::string &name, PipelineLayoutType pipelineLayoutType,
-                   vk::UniquePipelineLayout pipelineLayout)
-        : Asset(id, name), mPipelineLayoutType(pipelineLayoutType), mPipelineLayout(std::move(pipelineLayout))
-    {
-    }
     ~PipelineLayout() override = default;
     inline vk::PipelineLayout GetPipelineLayout() const
     {

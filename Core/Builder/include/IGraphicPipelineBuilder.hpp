@@ -9,7 +9,7 @@ class IGraphicPipelineBuilder : public virtual IBuilder<GraphicPipeline>
 {
   public:
     ~IGraphicPipelineBuilder() override = default;
-    virtual void SetName(const std::string &name) = 0;
+    virtual void SetName() = 0;
     virtual void SetVertexInputState() = 0;
     virtual void SetInputAssemblyState() = 0;
     virtual void SetShader() = 0;

@@ -1,40 +1,54 @@
 #include "GraphicPipelineBuilder.hpp"
+#include "GraphicPipeline.hpp"
 #include "Vertex.hpp"
+#include <memory>
 namespace MEngine::Core
 {
 void GraphicPipelineBuilder::Reset()
 {
-    mCreateInfo = vk::GraphicsPipelineCreateInfo();
-    mVertexBindings = vk::VertexInputBindingDescription();
-    mVertexAttributes.clear();
-    mVertexInputInfo = vk::PipelineVertexInputStateCreateInfo();
-    mInputAssemblyState = vk::PipelineInputAssemblyStateCreateInfo();
-    mRasterizationState = vk::PipelineRasterizationStateCreateInfo();
-    mMultisampleState = vk::PipelineMultisampleStateCreateInfo();
-    mDepthStencilState = vk::PipelineDepthStencilStateCreateInfo();
-    mColorBlendState = vk::PipelineColorBlendStateCreateInfo();
-    mColorBlendAttachments.clear();
-    mDynamicState = vk::PipelineDynamicStateCreateInfo();
-    mDynamicStates.clear();
-    mShaderStages.clear();
-    mRenderPass = nullptr;
-    mSubPass = 0;
-    mPipelineLayoutType = PipelineLayoutType::None;
+    mGraphicPipeline = std::unique_ptr<GraphicPipeline>(new GraphicPipeline());
+}
+std::unique_ptr<GraphicPipeline> GraphicPipelineBuilder::Build()
+{
+    auto &&[renderPass, subPass] = mRenderPassManager->GetRenderPass(mGraphicPipeline->mRenderPassType);
+    auto pipelineLayout = mPipelineLayoutManager->GetByType(mGraphicPipeline->mPipelineLayoutType);
+    mGraphicPipeline->mCreateInfo.setStages(mGraphicPipeline->mShaderStages)
+        .setPVertexInputState(&mGraphicPipeline->mVertexInputInfo)
+        .setPInputAssemblyState(&mGraphicPipeline->mInputAssemblyState)
+        .setPRasterizationState(&mGraphicPipeline->mRasterizationState)
+        .setPViewportState(&mGraphicPipeline->mViewportState)
+        .setPMultisampleState(&mGraphicPipeline->mMultisampleState)
+        .setPDepthStencilState(&mGraphicPipeline->mDepthStencilState)
+        .setPColorBlendState(&mGraphicPipeline->mColorBlendState)
+        .setPDynamicState(&mGraphicPipeline->mDynamicState)
+        .setLayout(pipelineLayout->GetPipelineLayout())
+        .setRenderPass(renderPass)
+        .setSubpass(subPass);
+    auto pipeline =
+        mVulkanContext->GetDevice().createGraphicsPipelineUnique(nullptr, mGraphicPipeline->mCreateInfo, nullptr);
+    if (pipeline.result != vk::Result::eSuccess)
+    {
+        throw std::runtime_error("Failed to create Graphic Pipeline");
+    }
+    mGraphicPipeline->mPipeline = std::move(pipeline.value);
+    return std::move(mGraphicPipeline);
 }
 void GraphicPipelineBuilder::SetVertexInputState()
 {
-    mVertexBindings = Vertex::GetVertexInputBindingDescription();
-    mVertexAttributes = Vertex::GetVertexInputAttributeDescription();
-    mVertexInputInfo.setVertexBindingDescriptions(mVertexBindings).setVertexAttributeDescriptions(mVertexAttributes);
+    mGraphicPipeline->mVertexBindings = Vertex::GetVertexInputBindingDescription();
+    mGraphicPipeline->mVertexAttributes = Vertex::GetVertexInputAttributeDescription();
+    mGraphicPipeline->mVertexInputInfo.setVertexBindingDescriptions(mGraphicPipeline->mVertexBindings)
+        .setVertexAttributeDescriptions(mGraphicPipeline->mVertexAttributes);
 }
 void GraphicPipelineBuilder::SetInputAssemblyState()
 {
-    mInputAssemblyState.setTopology(vk::PrimitiveTopology::eTriangleList).setPrimitiveRestartEnable(VK_FALSE);
+    mGraphicPipeline->mInputAssemblyState.setTopology(vk::PrimitiveTopology::eTriangleList)
+        .setPrimitiveRestartEnable(VK_FALSE);
 }
 
 void GraphicPipelineBuilder::SetRasterizationState()
 {
-    mRasterizationState.setDepthClampEnable(vk::False)
+    mGraphicPipeline->mRasterizationState.setDepthClampEnable(vk::False)
         .setRasterizerDiscardEnable(vk::False)
         .setPolygonMode(vk::PolygonMode::eFill)
         .setLineWidth(1.0f)
@@ -44,11 +58,11 @@ void GraphicPipelineBuilder::SetRasterizationState()
 }
 void GraphicPipelineBuilder::SetViewportState()
 {
-    mViewportState.setViewportCount(1).setScissorCount(1);
+    mGraphicPipeline->mViewportState.setViewportCount(1).setScissorCount(1);
 }
 void GraphicPipelineBuilder::SetMultiSampleState()
 {
-    mMultisampleState.setSampleShadingEnable(vk::False)
+    mGraphicPipeline->mMultisampleState.setSampleShadingEnable(vk::False)
         .setRasterizationSamples(vk::SampleCountFlagBits::e1)
         .setMinSampleShading(1.0f)
         .setPSampleMask(nullptr)
@@ -57,7 +71,7 @@ void GraphicPipelineBuilder::SetMultiSampleState()
 }
 void GraphicPipelineBuilder::SetDepthStencilState()
 {
-    mDepthStencilState.setDepthTestEnable(vk::True)
+    mGraphicPipeline->mDepthStencilState.setDepthTestEnable(vk::True)
         .setDepthWriteEnable(vk::True)
         .setDepthCompareOp(vk::CompareOp::eLess)
         .setDepthBoundsTestEnable(vk::False)
@@ -67,18 +81,19 @@ void GraphicPipelineBuilder::SetDepthStencilState()
 }
 void GraphicPipelineBuilder::SetColorBlendState()
 {
-    mColorBlendAttachments = {vk::PipelineColorBlendAttachmentState()
-                                  .setColorWriteMask(vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
-                                                     vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA)
-                                  .setBlendEnable(vk::False)};
-    mColorBlendState.setLogicOpEnable(vk::False)
+    mGraphicPipeline->mColorBlendAttachments = {
+        vk::PipelineColorBlendAttachmentState()
+            .setColorWriteMask(vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
+                               vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA)
+            .setBlendEnable(vk::False)};
+    mGraphicPipeline->mColorBlendState.setLogicOpEnable(vk::False)
         .setLogicOp(vk::LogicOp::eCopy)
-        .setAttachments(mColorBlendAttachments)
+        .setAttachments(mGraphicPipeline->mColorBlendAttachments)
         .setBlendConstants({0.0f, 0.0f, 0.0f, 0.0f});
 }
 void GraphicPipelineBuilder::SetDynamicState()
 {
-    mDynamicStates = {vk::DynamicState::eViewport, vk::DynamicState::eScissor};
-    mDynamicState.setDynamicStates(mDynamicStates);
+    mGraphicPipeline->mDynamicStates = {vk::DynamicState::eViewport, vk::DynamicState::eScissor};
+    mGraphicPipeline->mDynamicState.setDynamicStates(mGraphicPipeline->mDynamicStates);
 }
 } // namespace MEngine::Core

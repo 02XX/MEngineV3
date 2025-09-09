@@ -12,22 +12,14 @@ namespace MEngine::Core
 class ShaderBuilder final : public virtual IShaderBuilder
 {
   protected:
-    std::shared_ptr<VulkanContext> mVulkanContext;
+    std::shared_ptr<VulkanContext> mVulkanContext{};
 
-    vk::ShaderModuleCreateInfo mShaderModuleCreateInfo{};
-    std::vector<uint32_t> mCode{};
-    vk::ShaderStageFlagBits mStage{vk::ShaderStageFlagBits::eVertex};
-
-    std::filesystem::path mGLSLFilePath{};
-    std::string mGLSLSource{};
-    std::filesystem::path mSPIRVFilePath{};
-    std::vector<uint32_t> mSPIRVCode{};
-
-    std::string mName{};
+    std::unique_ptr<Shader> mShader{};
 
   public:
     ShaderBuilder(std::shared_ptr<VulkanContext> vulkanContext) : mVulkanContext(vulkanContext)
     {
+        mShader = std::unique_ptr<Shader>(new Shader());
     }
     ~ShaderBuilder() override = default;
     std::unique_ptr<Shader> Build() override;
@@ -40,7 +32,7 @@ class ShaderBuilder final : public virtual IShaderBuilder
     void CompileGLSLToSPIRV() override;
     inline void SetStage(vk::ShaderStageFlagBits stage) override
     {
-        mStage = stage;
+        mShader->mStage = stage;
     }
 };
 } // namespace MEngine::Core

@@ -8,21 +8,16 @@ namespace MEngine::Core
 class PipelineLayoutBuilder : public virtual IPipelineLayoutBuilder
 {
   protected:
-    std::shared_ptr<VulkanContext> mVulkanContext;
-
-  protected:
-    vk::PipelineLayoutCreateInfo mPipelineLayoutCreateInfo{};
-    std::vector<vk::DescriptorSetLayout> mSetLayouts{};
-    std::vector<vk::PushConstantRange> mPushConstantRanges{};
-
-    std::vector<vk::DescriptorSetLayoutBinding> mPipelineLayoutBindings{};
-    vk::UniqueDescriptorSetLayout mPipelineLayoutDescriptorSetLayout{};
+    std::shared_ptr<VulkanContext> mVulkanContext{};
+    std::unique_ptr<PipelineLayout> mPipelineLayout{};
 
   public:
     ~PipelineLayoutBuilder() override = default;
     PipelineLayoutBuilder(std::shared_ptr<VulkanContext> vulkanContext) : mVulkanContext(vulkanContext)
     {
+        mPipelineLayout = std::unique_ptr<PipelineLayout>(new PipelineLayout());
     }
+    std::unique_ptr<PipelineLayout> Build() override;
     void Reset() override;
     void SetBindings() override;
     void SetLayout() override;
